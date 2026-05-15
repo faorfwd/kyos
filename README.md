@@ -4,87 +4,69 @@
 [![npm](https://img.shields.io/npm/v/kyos-cli)](https://www.npmjs.com/package/kyos-cli)
 [![npm downloads](https://img.shields.io/npm/dm/kyos-cli)](https://www.npmjs.com/package/kyos-cli)
 
-`kyos-cli` is a repo-local CLI for standardizing Claude Code setup across many repositories. It installs a base `.claude/` layout and keeps a managed source layer under `.kyos/claude/` so updates are repeatable. Repo-owned customizations live in `.claude/`, and updates are guarded by `.kyos/lock.json` so local edits aren't overwritten silently.
-
-It also ships workflow prompts like `/kyos:architecture` and `/kyos:hire` for bigger planning, plus a feature delivery chain (`/kyos:spec -> /kyos:tech -> /kyos:tasks -> /kyos:implement -> /kyos:verify`) that works for features and complex bugfixes.
-
-## Prerequisites
-
-- Node.js 18 or later
-- npm / npx (bundled with Node)
-- [Claude Code](https://claude.ai/code) installed
+Claude is powerful — but without structure, conversations drift, context gets lost, and results are inconsistent. `kyos-cli` gives you a proven workflow so you don't have to figure that out yourself. One command sets it up in your project; from there, Claude knows how to guide you from idea to working code.
 
 ## Quickstart
 
-**bash / zsh:**
 ```bash
 npx kyos-cli --init
 ```
 
-**PowerShell:**
-```powershell
-npx kyos-cli --init
+- Sets up everything Claude Code needs in your project — commands, workflow steps, and a base config.
+- Safe to run on an existing project: it shows you what it would change before doing anything.
+- Run `--apply` to add only what's missing, or `--init --force` to start fresh.
+
+## The workflow
+
+Getting great results from Claude on complex tasks takes more than a single prompt — you need structure, clear steps, and a way to keep context across the session. `kyos-cli` gives you all of that out of the box.
+
+`kyos-cli` installs a structured workflow that breaks the process into clear steps:
+
+| Command | What it does |
+|---|---|
+| `/kyos:spec` | Nail down what you're building before touching any code |
+| `/kyos:tech` | Turn the idea into a concrete plan Claude can follow |
+| `/kyos:tasks` | Break the plan into small, checkable steps |
+| `/kyos:implement` | Execute the steps one by one, with verification at each |
+| `/kyos:verify` | Confirm the result actually matches what was planned |
+
+Run them in order for any feature or fix:
+
+```text
+/kyos:spec → /kyos:tech → /kyos:tasks → /kyos:implement → /kyos:verify
 ```
 
-Behavior:
+Each step saves its output to a file, so you can pause, resume in a new session, or hand off to someone else without losing context.
 
-- If the repo has no Claude setup yet, `--init` bootstraps `CLAUDE.md`, `.claude/`, and `.kyos/`.
-- Running `npx kyos-cli` with no flags also runs `--init`.
-- It seeds a `silent-executor` agent (Haiku) and its paired `silent-execution` skill so repos have a concise, execution-first mode available immediately.
-- Commands, agents, and skills live under `.kyos/claude/` as the managed source of truth; `.claude/` contains thin wrappers that link to the managed definitions (so updates are repeatable without overwriting local edits).
+There are also two planning commands for bigger decisions:
 
-## CLI reference
+| Command | What it does |
+|---|---|
+| `/kyos:prevalidate` | Quick safety check before making changes |
+| `/kyos:architecture` | Set or revise your project's technical direction |
+| `/kyos:hire` | Add support for tools or patterns missing from your stack |
+
+## Tips
+
+- **Compact after spec or tech** — if the context meter hits 50%+ after `/kyos:spec` or `/kyos:tech`, run `/compact` before continuing. Everything is saved to disk, so nothing is lost and the next command starts with a clean budget.
+- **Clear before implement** — run `/clear` just before `/kyos:implement` to give the implementation run the full context window. Then reference the saved tasks file directly: `/kyos:implement @docs/execution/your-feature/tasks.md`.
+- **Pick up where you left off** — if `spec.md`, `tech.md`, or `tasks.md` already exist when you open a new session, pass them in directly: `/kyos:tech @docs/execution/your-feature/spec.md`. Claude will read the file and continue from there.
+- **Keep earlier files in sync** — if something changes during `/kyos:tech` or `/kyos:tasks` (scope shifts, new constraints, a better approach), reflect those changes back in the earlier files too. Keeping spec, tech, and tasks aligned means they can later be assembled into accurate feature documentation with minimal effort.
+
+## CLI commands
 
 | Command | Description |
 |---|---|
-| `kyos-cli --init` | Bootstrap or analyze existing setup (default when no flag is given) |
-| `kyos-cli --init --force` | Destructively reset `.claude/`, `.kyos/`, and `CLAUDE.md` to baseline |
-| `kyos-cli --apply` | Write only missing managed files — never overwrites existing files |
-| `kyos-cli --update` | Force-rewrite `.kyos/` to current baseline (`.claude/` is untouched) |
+| `kyos-cli --init` | Set up or inspect an existing setup (default) |
+| `kyos-cli --init --force` | Reset everything to a clean baseline |
+| `kyos-cli --apply` | Add only missing files, never overwrites anything |
+| `kyos-cli --update` | Pull in the latest managed files without touching your customizations |
 | `kyos-cli --add <type> <name>` | Add a skill, agent, or MCP from the catalog |
-| `kyos-cli --doctor` | Check managed file integrity and report drift |
-
-## Workflow commands
-
-`kyos-cli` ships workflow prompts under `.claude/commands/` for Claude-side usage as slash-style commands:
-
-```text
-/kyos:prevalidate
-/kyos:architecture
-/kyos:hire
-
-/kyos:spec
-/kyos:tech
-/kyos:tasks
-/kyos:implement
-/kyos:verify
-```
-
-Foundation commands:
-
-- `/kyos:prevalidate` runs a quick read-only safety/security scan before you start running tools or changing code.
-- `/kyos:architecture` sets or revises the repo's technical direction. _(minimal stub — add repo-specific guidance in `.claude/commands/architecture.md`)_
-- `/kyos:hire` adds missing support around the current stack. _(minimal stub — add repo-specific guidance in `.claude/commands/hire.md`)_
-
-Daily delivery commands:
-
-- `/kyos:spec` writes a user-facing feature definition.
-- `/kyos:tech` turns the feature into an engineering plan.
-- `/kyos:tasks` breaks the plan into ordered execution slices.
-- `/kyos:implement` executes the plan in verified slices.
-- `/kyos:verify` checks the implementation against the spec and plan.
-
-Recommended flow:
-
-```text
-/kyos:spec -> /kyos:tech -> /kyos:tasks -> /kyos:implement -> /kyos:verify
-```
-
-The built-in command definitions are managed under `.kyos/claude/commands/`. `.claude/commands/` is seeded as the user-facing entrypoint folder with short wrapper files that link to the managed definitions, so updates are repeatable while the command surface stays in the standard place.
+| `kyos-cli --doctor` | Check that everything is in order |
 
 ## Catalog
 
-Add capabilities from the built-in registry with `--add`:
+Extend your setup with optional capabilities:
 
 ```bash
 kyos-cli --add skill release-notes
@@ -99,103 +81,24 @@ kyos-cli --add mcp context7
 kyos-cli --add mcp filesystem
 ```
 
-Each `--add skill` or `--add agent` creates a local stub under `.claude/` that you can fill with repo-specific guidance. Each `--add mcp` registers the server in `.mcp.json`.
-
-## Managed vs local files
-
-`kyos-cli` uses a two-layer model:
-
-- `.kyos/claude/` holds the managed source layer generated by the framework.
-- `.claude/` is the repo-owned override and customization layer.
-- `.kyos/` also holds framework state such as `config.json`, `version.json`, and `lock.json`.
-
-## Architecture
-
-This uses a split architecture:
-
-- the CLI handles deterministic mutations in `process.cwd()`.
-- the registry or catalog layer stays separate and discoverable.
-
-The catalog layer is represented by `catalog/registry.json`.
-
-## Installed layout
-
-```text
-CLAUDE.md
-.claude/
-  agents/
-  commands/
-  rules/
-  skills/
-
-.kyos/   (generated by kyos-cli in target repos)
-  claude/
-    agents/
-    commands/
-    rules/
-    skills/
-    settings.json
-  config.json
-  version.json
-  lock.json
-
-.mcp.json   (created by --add mcp)
-```
-
-## Existing repo behavior
-
-If a repo already contains `.claude/` or `CLAUDE.md`, `--init` switches to analysis mode and prints proposals without changing files:
-
-```text
-+ would add .claude/skills/README.md
-~ would update .claude/settings.json
-! CLAUDE.md (unmanaged file already exists with different content)
-```
-
-To apply only the missing files (safe, never overwrites):
-```bash
-npx kyos-cli --apply
-```
-
-To reset everything to baseline (destructive):
-```bash
-npx kyos-cli --init --force
-```
-
-### Conflict and blocked states
-
-- **conflict** — the file is tracked in `.kyos/lock.json` but its content has changed since it was last managed. The file has local edits kyos won't overwrite.
-- **blocked** — a file exists at a managed path but was never recorded in the lock file, so kyos treats it as unmanaged and won't touch it.
-
-In both cases, resolve by either accepting the baseline (`--init --force`) or keeping your version (no action needed — kyos will leave the file alone).
+Each addition creates a file you can fill with project-specific guidance. MCP entries are wired up automatically.
 
 ## Multi-repo rollout
 
-Because the CLI runs only in the current working directory, you can apply it repo-by-repo from another script:
+The CLI runs in whatever directory you're in, so you can roll it out across projects with a simple loop:
 
-**bash / zsh:**
 ```bash
 for repo in ./repo-a ./repo-b ./repo-c; do
   (cd "$repo" && npx kyos-cli --init)
 done
 ```
 
-**PowerShell:**
-```powershell
-$repos = @(".\repo-a", ".\repo-b", ".\repo-c")
-foreach ($repo in $repos) {
-  Push-Location $repo
-  npx kyos-cli --init
-  Pop-Location
-}
-```
-
 ## Security
 
 - **Zero runtime dependencies** — no third-party code runs when you install or use `kyos-cli`.
-- **No install scripts** — `package.json` declares no `preinstall`, `postinstall`, or `install` hooks. Nothing executes at install time.
-- **Publish provenance** — every release is published with [npm provenance attestation](https://docs.npmjs.com/generating-provenance-statements) via GitHub Actions, so the build source is cryptographically verifiable.
-- **Lockfile committed** — `package-lock.json` is committed and regenerated on every release to prevent dependency drift.
-- **Path traversal protection** — all file I/O is validated in `src/core/fs.js`: relative paths only, no `..` segments, no symlinks escaping the repo root.
+- **No install scripts** — nothing executes automatically at install time.
+- **Publish provenance** — every release is cryptographically verifiable via [npm provenance attestation](https://docs.npmjs.com/generating-provenance-statements).
+- **Lockfile committed** — dependency versions are pinned and regenerated on every release.
+- **Path safety** — all file operations are strictly sandboxed to your project directory.
 
 To report a vulnerability, see [SECURITY.md](./SECURITY.md).

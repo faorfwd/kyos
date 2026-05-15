@@ -14,11 +14,13 @@ Typical outcomes:
 
 ## Inputs
 
-- feature context
-- technical plan
-- execution task file (if provided)
 - current repo state
 - available specialists/agents, skills, and MCPs
+- `docs/execution/<spec-slug>/spec.md` — read automatically if it exists
+- `docs/execution/<spec-slug>/tech.md` — read automatically if it exists
+- `docs/execution/<spec-slug>/tasks.md` — read automatically if it exists (treated as the execution task file)
+
+Derive the slug from the argument if provided; otherwise glob `docs/execution/*/` and use the most recently modified folder.
 
 ## Workflow
 
@@ -74,7 +76,7 @@ If the task file exposes multiple ready slices that can be done independently, p
 
 When using this command, Claude should:
 
-1. Review the feature and technical context.
+1. Locate the execution folder (from argument or most recently modified `docs/execution/*/`). Read `spec.md`, `tech.md`, and `tasks.md` from that folder — all that exist. Treat `tasks.md` as the source of truth for progress and remaining work.
 2. Select the next concrete slice (or small set of independent slices).
 3. Search for relevant specialists/agents and spawn multiple in parallel when the slices are independent.
 4. Implement and validate the slice(s).

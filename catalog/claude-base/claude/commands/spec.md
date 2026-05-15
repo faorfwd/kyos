@@ -54,10 +54,27 @@ When using this command, Claude should:
 3. Draft a concise but specific functional spec.
 4. Mark unresolved questions explicitly.
 5. Save the result into a local planning note.
+6. After saving, check whether `tech.md` or `tasks.md` already exist in the same execution folder. If either exists, append a **Related** section to spec.md with links to the existing sibling artefacts.
 
 ## Next in flow
 
+If the context meter is at 50% or more, run `/compact` before continuing — the spec is saved to disk so nothing is lost.
+
 Continue with [`/kyos:tech`](./tech.md) to turn the feature behavior into an engineering approach.
+
+## Related section format
+
+The **Related** section belongs at the bottom of the artefact, above any trailing notes. Use this shape:
+
+```markdown
+## Related
+
+- [Spec](./spec.md)
+- [Tech](./tech.md)
+- [Tasks](./tasks.md)
+```
+
+Only include links that exist. When updating a sibling artefact, append the section if absent or insert the missing link into an existing section — do not duplicate entries.
 
 ## Where to save the result
 

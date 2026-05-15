@@ -15,18 +15,22 @@ Use this after one or more implementation slices have landed and you want a deli
 
 ## Sources to compare
 
-- the feature spec
-- the technical plan
 - the changed code
 - local test or check results, when available
+- `docs/execution/<spec-slug>/spec.md` — read automatically if it exists
+- `docs/execution/<spec-slug>/tech.md` — read automatically if it exists
+- `docs/execution/<spec-slug>/tasks.md` — read automatically if it exists
+
+Derive the slug from the argument if provided; otherwise glob `docs/execution/*/` and use the most recently modified folder.
 
 ## Verification pass
 
-1. Check whether the delivered behavior matches the promised behavior.
-2. Check whether the implementation drifted from the technical approach in a meaningful way.
-3. Run or inspect tests and validation steps where possible.
-4. Call out missing cases, regressions, or unclear behavior directly.
-5. End with a clear status: verified, partially verified, or needs rework.
+1. Locate the execution folder (from argument or most recently modified `docs/execution/*/`). Read `spec.md`, `tech.md`, and `tasks.md` from that folder — all that exist. Use them as the baseline to compare against the implementation.
+2. Check whether the delivered behavior matches the promised behavior.
+3. Check whether the implementation drifted from the technical approach in a meaningful way.
+4. Run or inspect tests and validation steps where possible.
+5. Call out missing cases, regressions, or unclear behavior directly.
+6. End with a clear verdict: verified, partially verified, or needs rework.
 
 ## Things to avoid
 

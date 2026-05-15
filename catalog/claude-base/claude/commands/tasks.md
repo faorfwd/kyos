@@ -15,10 +15,12 @@ Use this after the feature has both a functional spec and a technical approach, 
 
 ## Inputs to read
 
-- the current feature spec
-- the technical plan
 - current repo context and obvious code hotspots
 - existing test setup (test runner, frameworks, and CI checks), if any
+- `docs/execution/<spec-slug>/spec.md` — read automatically if it exists
+- `docs/execution/<spec-slug>/tech.md` — read automatically if it exists
+
+Derive the slug from the argument if provided; otherwise glob `docs/execution/*/` and use the most recently modified folder.
 
 ## How to break work down
 
@@ -44,6 +46,23 @@ Use this after the feature has both a functional spec and a technical approach, 
 /kyos:tasks turn the CSV import tech plan into ordered implementation work
 ```
 
+## Before writing tasks
+
+Before breaking work down, Claude should:
+
+1. Locate the execution folder (from argument or most recently modified `docs/execution/*/`).
+2. Read `spec.md` if it exists — use it to anchor scope and acceptance criteria.
+3. Read `tech.md` if it exists — use it to anchor sequencing, interfaces, and risks.
+4. If neither exists, proceed but note the missing context.
+
+## Cross-linking
+
+After saving tasks.md, Claude should:
+
+1. Include a **Related** section in tasks.md with links to `spec.md` and `tech.md` (both required; note if one is missing).
+2. Open `spec.md` in the same execution folder and add or update a link to `tasks.md` in its **Related** section (create the section if absent).
+3. Open `tech.md` in the same execution folder and add or update a link to `tasks.md` in its **Related** section (create the section if absent).
+
 ## What Claude should return
 
 The result should read like an execution board:
@@ -62,7 +81,17 @@ If the repo does not appear to have a working test harness yet, Claude should:
 
 ## Next in flow
 
-Continue with [`/kyos:implement`](./implement.md) to execute the slices one by one.
+Run `/clear` to drop accumulated context, then kick off implementation with the saved tasks file:
+
+```text
+/kyos:implement @docs/execution/<spec-slug>/tasks.md
+```
+
+This gives the implementation run the full context window and a direct reference to the task list.
+
+## Related section format
+
+See [`/kyos:spec`](./spec.md#related-section-format) for the canonical **Related** section shape. Follow the same format: a `## Related` block at the bottom with markdown links to sibling artefacts that exist. When updating a sibling, insert only the missing link — do not duplicate.
 
 ## Where to save the result
 

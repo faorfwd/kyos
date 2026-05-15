@@ -40,7 +40,7 @@ function renderManagedFiles({ cwd, config }) {
     "implement.md",
     "verify.md",
   ];
-  const managedAgents = ["README.md", "security-engineer.md", "silent-executor.md"];
+  const managedAgents = ["README.md", "security-engineer.md"];
   const managedSkills = ["silent-execution/SKILL.md"];
 
   const baseFiles = {

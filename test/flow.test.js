@@ -29,18 +29,12 @@ module.exports = function register(test) {
     assert.ok(exists(cwd, ".kyos/claude/commands/README.md"));
     assert.ok(exists(cwd, ".kyos/claude/commands/spec.md"));
     assert.ok(exists(cwd, ".kyos/claude/agents/security-engineer.md"));
-    assert.ok(exists(cwd, ".kyos/claude/agents/silent-executor.md"));
     assert.ok(exists(cwd, ".kyos/claude/skills/silent-execution/SKILL.md"));
 
     assert.ok(exists(cwd, ".claude/commands/README.md"));
     assert.ok(exists(cwd, ".claude/commands/spec.md"));
     assert.ok(exists(cwd, ".claude/commands/architecture.md"));
     assert.equal(exists(cwd, ".claude/agents/security-engineer.md"), false);
-    assert.ok(exists(cwd, ".claude/agents/silent-executor.md"));
-
-    const silentExecutor = fs.readFileSync(path.join(cwd, ".claude", "agents", "silent-executor.md"), "utf8");
-    assert.ok(silentExecutor.includes("model: haiku"));
-    assert.ok(silentExecutor.includes("../../.kyos/claude/agents/silent-executor.md"));
 
     const managedSpec = fs.readFileSync(path.join(cwd, ".kyos", "claude", "commands", "spec.md"), "utf8");
     const localSpec = fs.readFileSync(path.join(cwd, ".claude", "commands", "spec.md"), "utf8");

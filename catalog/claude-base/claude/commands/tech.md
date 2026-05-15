@@ -14,9 +14,9 @@ Typical outcomes:
 
 ## Inputs
 
-- the current feature description or spec
 - `.claude/commands/project-context.md`
 - the existing codebase
+- `docs/execution/<spec-slug>/spec.md` — read automatically if it exists (derive the slug from the argument, or scan `docs/execution/` and use the most recently modified folder)
 
 ## Workflow
 
@@ -45,15 +45,23 @@ Typical outcomes:
 
 When using this command, Claude should:
 
-1. Load the feature context and inspect relevant code.
+1. Locate the execution folder: if a slug or file path is provided as an argument, derive it from there; otherwise glob `docs/execution/*/` and pick the most recently modified folder. Then read `spec.md` from that folder if it exists — treat it as the primary feature context.
 2. Draft a specific implementation approach.
 3. Make assumptions visible and reviewable.
 4. Point out risk, migration, or operational concerns.
 5. Suggest `/kyos:hire` if the design introduces uncovered capabilities.
+6. Include a **Related** section in tech.md with a link to `spec.md` (required) and to `tasks.md` if it already exists.
+7. After saving tech.md, open `spec.md` in the same execution folder and add or update a link to `tech.md` in its **Related** section (create the section if absent).
 
 ## Next in flow
 
+If the context meter is at 50% or more, run `/compact` before continuing — the plan is saved to disk so nothing is lost.
+
 Continue with [`/kyos:tasks`](./tasks.md) to break the plan into ordered execution slices.
+
+## Related section format
+
+See [`/kyos:spec`](./spec.md#related-section-format) for the canonical **Related** section shape. Follow the same format: a `## Related` block at the bottom with markdown links to sibling artefacts that exist. When updating a sibling, insert only the missing link — do not duplicate.
 
 ## Where to save the result
 
