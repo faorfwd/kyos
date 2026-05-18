@@ -81,6 +81,8 @@ If the repo does not appear to have a working test harness yet, Claude should:
 
 ## Next in flow
 
+**Model tip:** Use `/model sonnet` for straightforward issues, `/model opus` for large or architecturally complex ones. Revert when the planning phase is done.
+
 Run `/clear` to drop accumulated context, then kick off implementation with the saved tasks file:
 
 ```text

@@ -58,6 +58,8 @@ When using this command, Claude should:
 
 ## Next in flow
 
+**Model tip:** Use `/model sonnet` for straightforward issues, `/model opus` for large or architecturally complex ones. Revert when the planning phase is done.
+
 If the context meter is at 50% or more, run `/compact` before continuing — the spec is saved to disk so nothing is lost.
 
 Continue with [`/kyos:tech`](./tech.md) to turn the feature behavior into an engineering approach.

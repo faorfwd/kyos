@@ -6,59 +6,20 @@
     }
   },
   "baseline": {
-    "skills": [
-      "silent-execution",
-      "critic"
-    ],
+    "skills": [],
     "agents": [
       "product-manager"
     ]
   },
   "skills": {
-    "release-notes": {
-      "description": "Helps standardize release-note authoring across repositories.",
-      "notes": [
-        "This generates only a local override stub.",
-        "Keep repo-specific formatting here instead of changing managed templates."
-      ]
+    "critic": {
+      "description": "A sparring partner that challenges decisions, plans, and assumptions."
     },
-    "security-audit": {
-      "description": "Guides a lightweight security audit and threat review for the current repo.",
-      "notes": [
-        "This generates only a local override stub.",
-        "Keep findings and repo-specific security practices here."
-      ]
-    },
-    "path-safety": {
-      "description": "Checks common path traversal and filesystem write risks in repo tooling.",
-      "notes": [
-        "This generates only a local override stub.",
-        "Use it when adding new file-writes or accepting user-controlled paths."
-      ]
-    },
-    "mcp-hardening": {
-      "description": "Reviews MCP configuration trust boundaries and safe defaults for shared repos.",
-      "notes": [
-        "This generates only a local override stub.",
-        "Use it before enabling MCPs in CI or shared machines."
-      ]
-    },
-    "secrets-and-supply-chain": {
-      "description": "Documents how the repo handles secrets, registries, and third-party execution safely.",
-      "notes": [
-        "This generates only a local override stub.",
-        "Capture agreed rules (token storage, pinning, review steps) here."
-      ]
+    "silent-execution": {
+      "description": "Execution-first mode with minimal narration."
     }
   },
-  "agents": {
-    "triage": {
-      "description": "Documents repo-specific issue triage rules and escalation paths.",
-      "notes": [
-        "Use the override stub to describe ownership and local workflows."
-      ]
-    }
-  },
+  "agents": {},
   "mcps": {
     "context7": {
       "description": "Up-to-date code and library documentation via Context7 MCP.",

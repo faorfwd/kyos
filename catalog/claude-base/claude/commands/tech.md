@@ -55,6 +55,8 @@ When using this command, Claude should:
 
 ## Next in flow
 
+**Model tip:** Use `/model sonnet` for straightforward issues, `/model opus` for large or architecturally complex ones. Revert when the planning phase is done.
+
 If the context meter is at 50% or more, run `/compact` before continuing — the plan is saved to disk so nothing is lost.
 
 Continue with [`/kyos:tasks`](./tasks.md) to break the plan into ordered execution slices.

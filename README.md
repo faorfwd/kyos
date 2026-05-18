@@ -44,7 +44,7 @@ There are also two planning commands for bigger decisions:
 |---|---|
 | `/kyos:prevalidate` | Quick safety check before making changes |
 | `/kyos:architecture` | Set or revise your project's technical direction |
-| `/kyos:hire` | Add support for tools or patterns missing from your stack |
+| `/kyos:hire` | Create skills, agents, or wire up MCPs to fill gaps in your repo's support layer |
 
 ## Tips
 
@@ -52,6 +52,7 @@ There are also two planning commands for bigger decisions:
 - **Clear before implement** — run `/clear` just before `/kyos:implement` to give the implementation run the full context window. Then reference the saved tasks file directly: `/kyos:implement @docs/execution/your-feature/tasks.md`.
 - **Pick up where you left off** — if `spec.md`, `tech.md`, or `tasks.md` already exist when you open a new session, pass them in directly: `/kyos:tech @docs/execution/your-feature/spec.md`. Claude will read the file and continue from there.
 - **Keep earlier files in sync** — if something changes during `/kyos:tech` or `/kyos:tasks` (scope shifts, new constraints, a better approach), reflect those changes back in the earlier files too. Keeping spec, tech, and tasks aligned means they can later be assembled into accurate feature documentation with minimal effort.
+- **Pick the right model for planning** — before running `/kyos:spec`, `/kyos:tech`, or `/kyos:tasks`, set your model with `/model`: use `sonnet` for straightforward issues, `opus` for large or architecturally complex ones. Don't forget to revert when the planning phase is done.
 
 ## CLI commands
 
@@ -69,19 +70,14 @@ There are also two planning commands for bigger decisions:
 Extend your setup with optional capabilities:
 
 ```bash
-kyos-cli --add skill release-notes
-kyos-cli --add skill security-audit
-kyos-cli --add skill path-safety
-kyos-cli --add skill mcp-hardening
-kyos-cli --add skill secrets-and-supply-chain
+kyos-cli --add skill critic          # Adds a sparring-partner skill that challenges plans before you commit to them
+kyos-cli --add skill silent-execution # Cuts Claude's narration dramatically — act first, explain only when needed. Saves a significant amount of tokens on large tasks.
 
-kyos-cli --add agent triage
-
-kyos-cli --add mcp context7
-kyos-cli --add mcp filesystem
+kyos-cli --add mcp context7          # Gives Claude up-to-date docs for libraries and frameworks you use
+kyos-cli --add mcp filesystem        # Lets Claude read and write files outside the project directory
 ```
 
-Each addition creates a file you can fill with project-specific guidance. MCP entries are wired up automatically.
+MCP entries are wired up automatically.
 
 ## Multi-repo rollout
 
