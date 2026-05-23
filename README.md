@@ -38,7 +38,7 @@ Run them in order for any feature or fix:
 
 Each step saves its output to a file, so you can pause, resume in a new session, or hand off to someone else without losing context.
 
-There are also two planning commands for bigger decisions:
+Three commands sit outside the main chain. Reach for them when the repo needs a safety check, a technical direction, or better tooling support:
 
 | Command | What it does |
 |---|---|
