@@ -3,8 +3,10 @@
 [![Socket Badge](https://badge.socket.dev/npm/package/kyos-cli)](https://socket.dev/npm/package/kyos-cli)
 [![npm](https://img.shields.io/npm/v/kyos-cli)](https://www.npmjs.com/package/kyos-cli)
 [![npm downloads](https://img.shields.io/npm/dt/kyos-cli)](https://www.npmjs.com/package/kyos-cli)
+[![License](https://img.shields.io/npm/l/kyos-cli)](https://www.npmjs.com/package/kyos-cli)
+[![Node version](https://img.shields.io/node/v/kyos-cli)](https://nodejs.org)
 
-Claude is powerful — but without structure, conversations drift, context gets lost, and results are inconsistent. `kyos-cli` gives you a proven workflow so you don't have to figure that out yourself. One command sets it up in your project; from there, Claude knows how to guide you from idea to working code.
+Claude Code works best with structure — without it, conversations drift, context gets lost, and results get inconsistent. `kyos-cli` installs a set of workflow commands into your project so you can move from idea to working code in a repeatable way. One command sets it up; the rest is up to you and Claude.
 
 ## Quickstart
 
@@ -12,28 +14,28 @@ Claude is powerful — but without structure, conversations drift, context gets 
 npx kyos-cli --init
 ```
 
-- Sets up everything Claude Code needs in your project — commands, workflow steps, and a base config.
+- Sets up a base Claude Code structure in your project — commands, workflow steps, and a config.
 - Safe to run on an existing project: it shows you what it would change before doing anything.
 - Run `--apply` to add only what's missing, or `--init --force` to start fresh.
 
 ## The workflow
 
-Getting great results from Claude on complex tasks takes more than a single prompt — you need structure, clear steps, and a way to keep context across the session. `kyos-cli` gives you all of that out of the box.
+Getting consistent results from Claude on complex tasks takes more than a single prompt — you need structure, clear steps, and a way to keep context across the session. `kyos-cli` gives you a starting point for that structure.
 
 `kyos-cli` installs a structured workflow that breaks the process into clear steps:
 
 | Command | What it does |
 |---|---|
-| `/kyos:spec` | Nail down what you're building before touching any code |
-| `/kyos:tech` | Turn the idea into a concrete plan Claude can follow |
-| `/kyos:tasks` | Break the plan into small, checkable steps |
-| `/kyos:implement` | Execute the steps one by one, with verification at each |
-| `/kyos:verify` | Confirm the result actually matches what was planned |
+| `/spec` | Nail down what you're building before touching any code |
+| `/tech` | Turn the idea into a concrete plan Claude can follow |
+| `/tasks` | Break the plan into small, checkable steps |
+| `/implement` | Execute the steps one by one, with verification at each |
+| `/verify` | Confirm the result actually matches what was planned |
 
 Run them in order for any feature or fix:
 
 ```text
-/kyos:spec → /kyos:tech → /kyos:tasks → /kyos:implement → /kyos:verify
+/spec → /tech → /tasks → /implement → /verify
 ```
 
 Each step saves its output to a file, so you can pause, resume in a new session, or hand off to someone else without losing context.
@@ -42,17 +44,19 @@ Three commands sit outside the main chain. Reach for them when the repo needs a 
 
 | Command | What it does |
 |---|---|
-| `/kyos:prevalidate` | Quick safety check before making changes |
-| `/kyos:architecture` | Set or revise your project's technical direction |
-| `/kyos:hire` | Create skills, agents, or wire up MCPs to fill gaps in your repo's support layer |
+| `/prevalidate` | Quick safety check before making changes |
+| `/architecture` | Set or revise your project's technical direction |
+| `/hire` | Create skills, agents, or wire up MCPs to fill gaps in your repo's support layer |
 
 ## Tips
 
-- **Compact after spec or tech** — if the context meter hits 50%+ after `/kyos:spec` or `/kyos:tech`, run `/compact` before continuing. Everything is saved to disk, so nothing is lost and the next command starts with a clean budget.
-- **Clear before implement** — run `/clear` just before `/kyos:implement` to give the implementation run the full context window. Then reference the saved tasks file directly: `/kyos:implement @docs/execution/your-feature/tasks.md`.
-- **Pick up where you left off** — if `spec.md`, `tech.md`, or `tasks.md` already exist when you open a new session, pass them in directly: `/kyos:tech @docs/execution/your-feature/spec.md`. Claude will read the file and continue from there.
-- **Keep earlier files in sync** — if something changes during `/kyos:tech` or `/kyos:tasks` (scope shifts, new constraints, a better approach), reflect those changes back in the earlier files too. Keeping spec, tech, and tasks aligned means they can later be assembled into accurate feature documentation with minimal effort.
-- **Pick the right model for planning** — before running `/kyos:spec`, `/kyos:tech`, or `/kyos:tasks`, set your model with `/model`: use `sonnet` for straightforward issues, `opus` for large or architecturally complex ones. Don't forget to revert when the planning phase is done.
+- **Compact after spec or tech** — if the context meter hits 50%+ after `/spec` or `/tech`, run `/compact` before continuing. Everything is saved to disk, so nothing is lost and the next command starts with a clean budget.
+- **Clear before implement** — run `/clear` just before `/implement` to give the implementation run the full context window. Then reference the saved tasks file directly: `/implement @docs/execution/your-feature/tasks.md`.
+- **Pick up where you left off** — if `spec.md`, `tech.md`, or `tasks.md` already exist when you open a new session, pass them in directly: `/tech @docs/execution/your-feature/spec.md`. Claude will read the file and continue from there.
+- **Keep earlier files in sync** — if something changes during `/tech` or `/tasks` (scope shifts, new constraints, a better approach), reflect those changes back in the earlier files too. Keeping spec, tech, and tasks aligned means they can later be assembled into accurate feature documentation with minimal effort.
+- **Pick the right model for planning** — before running `/spec`, `/tech`, or `/tasks`, set your model with `/model`: use `sonnet` for straightforward issues, `opus` for large or architecturally complex ones. Don't forget to revert when the planning phase is done.
+- **Keep CLAUDE.md accurate** — revisit it as your project evolves. Stale instructions quietly degrade Claude's output; a brief review after major changes pays off more than it costs.
+- **Start with agents if you have none** — if your project doesn't have any agents set up yet, run `/hire` before anything else. It's the fastest way to give Claude the right capabilities for your stack before you start building.
 
 ## CLI commands
 
