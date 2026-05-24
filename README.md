@@ -2,7 +2,7 @@
 
 [![Socket Badge](https://badge.socket.dev/npm/package/kyos-cli)](https://socket.dev/npm/package/kyos-cli)
 [![npm](https://img.shields.io/npm/v/kyos-cli)](https://www.npmjs.com/package/kyos-cli)
-[![npm downloads](https://img.shields.io/npm/dm/kyos-cli)](https://www.npmjs.com/package/kyos-cli)
+[![npm downloads](https://img.shields.io/npm/dt/kyos-cli)](https://www.npmjs.com/package/kyos-cli)
 
 Claude is powerful — but without structure, conversations drift, context gets lost, and results are inconsistent. `kyos-cli` gives you a proven workflow so you don't have to figure that out yourself. One command sets it up in your project; from there, Claude knows how to guide you from idea to working code.
 
