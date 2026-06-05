@@ -22,7 +22,7 @@ module.exports = function register(test) {
     assert.equal(result.ok, true);
     assert.ok(exists(cwd, ".kyos/config.json"));
     assert.ok(exists(cwd, ".kyos/lock.json"));
-    assert.ok(exists(cwd, ".kyos/claude/settings.json"));
+    assert.ok(exists(cwd, ".claude/settings.json"));
     assert.ok(exists(cwd, ".kyos/claude/rules/README.md"));
     assert.ok(exists(cwd, "CLAUDE.md"));
 
@@ -68,10 +68,10 @@ module.exports = function register(test) {
 
     const gitignore = fs.readFileSync(path.join(cwd, ".gitignore"), "utf8");
     assert.ok(gitignore.includes("node_modules/"));
-    assert.ok(gitignore.includes(".kyos/"));
+    assert.ok(gitignore.includes(".kyos/claude/"));
   });
 
-  test("bootstrap creates .gitignore with .kyos/ when missing", () => {
+  test("bootstrap creates .gitignore with .kyos/claude/ when missing", () => {
     const cwd = mkTempDir("kyos-gitignore-missing-");
 
     const result = runBootstrap({ cwd, apply: false });
@@ -81,10 +81,10 @@ module.exports = function register(test) {
     assert.ok(fs.existsSync(gitignorePath));
 
     const gitignore = fs.readFileSync(gitignorePath, "utf8");
-    assert.ok(gitignore.includes(".kyos/"));
+    assert.ok(gitignore.includes(".kyos/claude/"));
   });
 
-  test("bootstrap appends .kyos/ to an existing .gitignore", () => {
+  test("bootstrap appends .kyos/claude/ to an existing .gitignore", () => {
     const cwd = mkTempDir("kyos-gitignore-existing-");
     fs.writeFileSync(path.join(cwd, ".gitignore"), "node_modules/\n", "utf8");
 
@@ -97,7 +97,7 @@ module.exports = function register(test) {
     const lines = gitignore.replace(/\r\n/g, "\n").split("\n");
     const kyosCount = lines.filter((line) => {
       const trimmed = line.trim();
-      return trimmed === ".kyos" || trimmed === ".kyos/";
+      return trimmed === ".kyos/claude" || trimmed === ".kyos/claude/";
     }).length;
 
     assert.equal(kyosCount, 1);
@@ -197,6 +197,26 @@ module.exports = function register(test) {
       "utf8"
     );
     assert.equal(fs.readFileSync(managedSpecPath, "utf8"), catalogSpec);
+
+    // .kyos/config.json must survive the reset
+    assert.ok(exists(cwd, ".kyos/config.json"), ".kyos/config.json should not be deleted by --update");
+  });
+
+  test("--update preserves user config across reset", () => {
+    const cwd = mkTempDir("kyos-update-config-");
+    runBootstrap({ cwd, apply: false });
+
+    // Add a capability so config.json has non-default content
+    addCapability({ cwd, type: "skill", name: "release-notes" });
+
+    const configPath = path.join(cwd, ".kyos", "config.json");
+    const configBefore = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    assert.ok(configBefore.installed.skills.includes("release-notes"));
+
+    runUpdateKyos({ cwd });
+
+    const configAfter = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    assert.deepEqual(configAfter, configBefore, "config.json must be identical after --update");
   });
 
   test(".claude command wrappers are not overwritten if customized", () => {
@@ -376,19 +396,59 @@ module.exports = function register(test) {
     assert.ok((config.installed.agents || []).includes("triage"));
   });
 
-  test("add mcp writes to .mcp.json and records in config", () => {
+  test("add mcp writes to .claude/settings.json and records in config", () => {
     const cwd = mkTempDir("kyos-add-mcp-");
     runBootstrap({ cwd, apply: false });
 
     const result = addCapability({ cwd, type: "mcp", name: "context7" });
     assert.equal(result.ok, true);
 
-    const mcpConfig = JSON.parse(fs.readFileSync(path.join(cwd, ".mcp.json"), "utf8"));
-    assert.ok(mcpConfig.mcpServers && mcpConfig.mcpServers.context7, "context7 entry should exist in mcpServers");
-    assert.equal(mcpConfig.mcpServers.context7.url, "https://mcp.context7.com/mcp");
+    const settings = JSON.parse(fs.readFileSync(path.join(cwd, ".claude", "settings.json"), "utf8"));
+    assert.ok(settings.mcpServers && settings.mcpServers.context7, "context7 entry should exist in mcpServers");
+    assert.equal(settings.mcpServers.context7.url, "https://mcp.context7.com/mcp");
+    assert.ok(settings.permissions, "existing settings keys must be preserved");
 
     const config = JSON.parse(fs.readFileSync(path.join(cwd, ".kyos", "config.json"), "utf8"));
     assert.ok((config.installed.mcps || []).includes("context7"));
+  });
+
+  test("add mcp creates .claude/settings.json when it does not exist yet", () => {
+    const cwd = mkTempDir("kyos-add-mcp-no-settings-");
+    runBootstrap({ cwd, apply: false });
+    fs.rmSync(path.join(cwd, ".claude", "settings.json"));
+
+    const result = addCapability({ cwd, type: "mcp", name: "context7" });
+    assert.equal(result.ok, true);
+
+    const settings = JSON.parse(fs.readFileSync(path.join(cwd, ".claude", "settings.json"), "utf8"));
+    assert.ok(settings.mcpServers && settings.mcpServers.context7, "context7 entry should exist");
+  });
+
+  test("add mcp accumulates multiple MCPs without overwriting earlier ones", () => {
+    const cwd = mkTempDir("kyos-add-mcp-multi-");
+    runBootstrap({ cwd, apply: false });
+
+    addCapability({ cwd, type: "mcp", name: "context7" });
+    addCapability({ cwd, type: "mcp", name: "filesystem" });
+
+    const settings = JSON.parse(fs.readFileSync(path.join(cwd, ".claude", "settings.json"), "utf8"));
+    assert.ok(settings.mcpServers.context7, "context7 must still be present");
+    assert.ok(settings.mcpServers.filesystem, "filesystem must be present");
+    assert.ok(settings.permissions, "other settings keys must be preserved");
+  });
+
+  test("add mcp is idempotent when called twice with the same name", () => {
+    const cwd = mkTempDir("kyos-add-mcp-idempotent-");
+    runBootstrap({ cwd, apply: false });
+
+    addCapability({ cwd, type: "mcp", name: "context7" });
+    addCapability({ cwd, type: "mcp", name: "context7" });
+
+    const settings = JSON.parse(fs.readFileSync(path.join(cwd, ".claude", "settings.json"), "utf8"));
+    assert.equal(Object.keys(settings.mcpServers).length, 1, "mcpServers should have exactly one entry");
+
+    const config = JSON.parse(fs.readFileSync(path.join(cwd, ".kyos", "config.json"), "utf8"));
+    assert.equal(config.installed.mcps.filter((n) => n === "context7").length, 1, "installed.mcps should not duplicate");
   });
 
   test("add skill records capability in config.json", () => {
@@ -400,5 +460,102 @@ module.exports = function register(test) {
 
     const config = JSON.parse(fs.readFileSync(path.join(cwd, ".kyos", "config.json"), "utf8"));
     assert.ok((config.installed.skills || []).includes("path-safety"));
+  });
+
+  test("--apply replays installed skill stub when .claude file is missing", () => {
+    const cwd = mkTempDir("kyos-apply-installed-skill-");
+    runBootstrap({ cwd, apply: false });
+    addCapability({ cwd, type: "skill", name: "release-notes" });
+
+    // simulate fresh clone: remove the .claude stub that --add wrote
+    const stubPath = path.join(cwd, ".claude", "skills", "release-notes", "SKILL.md");
+    fs.rmSync(stubPath);
+    assert.equal(exists(cwd, ".claude/skills/release-notes/SKILL.md"), false);
+
+    const result = runApply({ cwd });
+    assert.equal(result.ok, true);
+    assert.ok(exists(cwd, ".claude/skills/release-notes/SKILL.md"), "stub should be recreated by --apply");
+    assert.ok(result.lines.some((l) => String(l).includes("release-notes")));
+  });
+
+  test("--apply replays installed agent stub when .claude file is missing", () => {
+    const cwd = mkTempDir("kyos-apply-installed-agent-");
+    runBootstrap({ cwd, apply: false });
+    addCapability({ cwd, type: "agent", name: "triage" });
+
+    const stubPath = path.join(cwd, ".claude", "agents", "triage.md");
+    fs.rmSync(stubPath);
+    assert.equal(exists(cwd, ".claude/agents/triage.md"), false);
+
+    const result = runApply({ cwd });
+    assert.equal(result.ok, true);
+    assert.ok(exists(cwd, ".claude/agents/triage.md"), "agent stub should be recreated by --apply");
+    assert.ok(result.lines.some((l) => String(l).includes("triage")));
+  });
+
+  test("--apply replays installed mcp when missing from settings", () => {
+    const cwd = mkTempDir("kyos-apply-installed-mcp-");
+    runBootstrap({ cwd, apply: false });
+    addCapability({ cwd, type: "mcp", name: "context7" });
+
+    // remove the mcp entry from settings to simulate fresh clone
+    const settingsPath = path.join(cwd, ".claude", "settings.json");
+    const settings = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+    delete settings.mcpServers.context7;
+    fs.writeFileSync(settingsPath, JSON.stringify(settings), "utf8");
+
+    const result = runApply({ cwd });
+    assert.equal(result.ok, true);
+
+    const after = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+    assert.ok(after.mcpServers && after.mcpServers.context7, "context7 should be re-registered by --apply");
+    assert.ok(result.lines.some((l) => String(l).includes("context7")));
+  });
+
+  test("--apply does not duplicate installed skill stub when already present", () => {
+    const cwd = mkTempDir("kyos-apply-skill-noop-");
+    runBootstrap({ cwd, apply: false });
+    addCapability({ cwd, type: "skill", name: "release-notes" });
+
+    const stubPath = path.join(cwd, ".claude", "skills", "release-notes", "SKILL.md");
+    const contentBefore = fs.readFileSync(stubPath, "utf8");
+
+    const result = runApply({ cwd });
+    assert.equal(result.ok, true);
+
+    const contentAfter = fs.readFileSync(stubPath, "utf8");
+    assert.equal(contentAfter, contentBefore, "existing stub must not be modified");
+    assert.ok(!result.lines.some((l) => String(l).includes("release-notes")), "no line for already-present stub");
+  });
+
+  test("--apply does not duplicate installed agent stub when already present", () => {
+    const cwd = mkTempDir("kyos-apply-agent-noop-");
+    runBootstrap({ cwd, apply: false });
+    addCapability({ cwd, type: "agent", name: "triage" });
+
+    const stubPath = path.join(cwd, ".claude", "agents", "triage.md");
+    const contentBefore = fs.readFileSync(stubPath, "utf8");
+
+    const result = runApply({ cwd });
+    assert.equal(result.ok, true);
+
+    const contentAfter = fs.readFileSync(stubPath, "utf8");
+    assert.equal(contentAfter, contentBefore, "existing agent stub must not be modified");
+    assert.ok(!result.lines.some((l) => String(l).includes("triage")), "no line for already-present agent");
+  });
+
+  test("--apply does not duplicate installed mcp when already in settings", () => {
+    const cwd = mkTempDir("kyos-apply-mcp-noop-");
+    runBootstrap({ cwd, apply: false });
+    addCapability({ cwd, type: "mcp", name: "context7" });
+
+    const settingsPath = path.join(cwd, ".claude", "settings.json");
+    const settingsBefore = fs.readFileSync(settingsPath, "utf8");
+
+    const result = runApply({ cwd });
+    assert.equal(result.ok, true);
+
+    assert.equal(fs.readFileSync(settingsPath, "utf8"), settingsBefore, "settings.json must not be modified");
+    assert.ok(!result.lines.some((l) => String(l).includes("context7")), "no line for already-registered mcp");
   });
 };

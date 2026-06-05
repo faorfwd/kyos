@@ -40,11 +40,14 @@ function saveUserConfig(cwd, config) {
 
 function loadMcpConfig(cwd) {
   const filePath = path.resolve(cwd, MCP_CONFIG_FILE);
-  return readJsonIfExists(filePath) || { mcpServers: {} };
+  const data = readJsonIfExists(filePath) || {};
+  return { mcpServers: data.mcpServers || {} };
 }
 
-function saveMcpConfig(cwd, config) {
-  writeRepoTextFile(cwd, MCP_CONFIG_FILE, stableStringify(config));
+function saveMcpConfig(cwd, mcpConfig) {
+  const filePath = path.resolve(cwd, MCP_CONFIG_FILE);
+  const existing = readJsonIfExists(filePath) || {};
+  writeRepoTextFile(cwd, MCP_CONFIG_FILE, stableStringify({ ...existing, mcpServers: mcpConfig.mcpServers }));
 }
 
 function addInstalledCapability(config, type, name) {

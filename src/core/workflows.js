@@ -19,6 +19,7 @@ const {
   saveUserConfig,
 } = require("./config");
 const { readJsonIfExists, resolveRepoPath, writeRepoTextFile } = require("./fs");
+const { stableStringify } = require("./json");
 const { sha256 } = require("./hash");
 const {
   applyManagedChanges,
@@ -101,12 +102,12 @@ function ensureLineInFile(absolutePath, line) {
 }
 
 function ensureGitignoreHasKyos({ cwd }) {
-  ensureLineInFile(resolveRepoPath(cwd, ".gitignore"), ".kyos/");
+  ensureLineInFile(resolveRepoPath(cwd, ".gitignore"), ".kyos/claude/");
 }
 
 function forceResetKyosOnly({ cwd }) {
   const rootReal = fs.realpathSync.native(cwd);
-  const targets = [STATE_ROOT];
+  const targets = [MANAGED_ROOT];
 
   for (const relativePath of targets) {
     const absolutePath = resolveRepoPath(cwd, relativePath);
@@ -324,6 +325,15 @@ function planLocalClaudeSeed({ cwd }) {
       "# Local Skills\n\nPut repo-specific skills here. These are repo-owned instructions that complement the managed base under `.kyos/claude/`.\n",
     [`${CLAUDE_ROOT}/rules/README.md`]:
       "# Local Rules\n\nPut repo-specific working rules here (coding standards, review expectations, release rules, security notes).\n",
+    [`${CLAUDE_ROOT}/settings.json`]: stableStringify({
+      permissions: {
+        defaultMode: "ask",
+      },
+      statusLine: {
+        showBranch: true,
+        showDirty: true,
+      },
+    }),
     [`${CLAUDE_ROOT}/commands/README.md`]:
       "# Local Commands\n\nThis folder is for repo-owned workflow prompts (slash-style commands).\n\nRecommended daily flow:\n\n`/kyos:spec -> /kyos:tech -> /kyos:tasks -> /kyos:implement -> /kyos:verify`\n\nIf you’re new to the repo or about to run tooling/scripts, start with:\n\n`/kyos:prevalidate`\n",
     [`${CLAUDE_ROOT}/commands/prevalidate.md`]:
@@ -531,11 +541,6 @@ function runDoctor({ cwd }) {
     commandReport.push(`command: ${filename} local ${localNote}; managed ${managedNote}`);
   }
 
-  const mcpConfig = loadMcpConfig(cwd);
-  if (!mcpConfig.mcpServers || typeof mcpConfig.mcpServers !== "object") {
-    errors.push(`${MCP_CONFIG_FILE} must contain an object with an 'mcpServers' key.`);
-  }
-
   return {
     ok: errors.length === 0,
     summary: "doctor summary",
@@ -734,6 +739,50 @@ function symbolForAction(action) {
   }
 }
 
+function replayInstalledCapabilities({ cwd, config }) {
+  const catalog = loadCatalog();
+  const lines = [];
+
+  for (const name of (config.installed.skills || [])) {
+    const targetPath = `${CLAUDE_ROOT}/skills/${name}/SKILL.md`;
+    if (!fs.existsSync(resolveRepoPath(cwd, targetPath))) {
+      const capability = getCapability(catalog, "skill", name);
+      writeRepoTextFile(cwd, targetPath, createOverrideTemplate({ type: "skill", name, capability }));
+      lines.push(`+ ${targetPath}`);
+    }
+  }
+
+  for (const name of (config.installed.agents || [])) {
+    const targetPath = `${CLAUDE_ROOT}/agents/${name}.md`;
+    if (!fs.existsSync(resolveRepoPath(cwd, targetPath))) {
+      const capability = getCapability(catalog, "agent", name);
+      writeRepoTextFile(cwd, targetPath, createOverrideTemplate({ type: "agent", name, capability }));
+      lines.push(`+ ${targetPath}`);
+    }
+  }
+
+  const mcpNames = config.installed.mcps || [];
+  if (mcpNames.length > 0) {
+    const mcpConfig = loadMcpConfig(cwd);
+    let changed = false;
+    for (const name of mcpNames) {
+      if (!mcpConfig.mcpServers[name]) {
+        const capability = getCapability(catalog, "mcp", name);
+        if (capability) {
+          mcpConfig.mcpServers[name] = capability.definition;
+          changed = true;
+          lines.push(`+ mcp:${name}`);
+        }
+      }
+    }
+    if (changed) {
+      saveMcpConfig(cwd, mcpConfig);
+    }
+  }
+
+  return lines;
+}
+
 function runApply({ cwd }) {
   if (!detectExistingClaudeSetup(cwd)) {
     return { ok: true, summary: "Nothing to apply. Run --init to bootstrap." };
@@ -755,10 +804,11 @@ function runApply({ cwd }) {
 
   applyManagedChanges({ cwd, plan: { results: createOnlyResults, finalLockFiles: createOnlyLockFiles } });
   applyLocalClaudeSeed({ cwd, plan: localSeedPlan });
+  const installedLines = replayInstalledCapabilities({ cwd, config });
   ensureGitignoreHasKyos({ cwd });
 
   const seedCreated = localSeedPlan.results.filter((item) => item.action === "create").length;
-  const created = createOnlyResults.length + seedCreated;
+  const created = createOnlyResults.length + seedCreated + installedLines.length;
   const skipped = plan.results.filter(
     (item) => item.action === "update" || item.action === "conflict" || item.action === "blocked"
   ).length;
@@ -776,6 +826,8 @@ function runApply({ cwd }) {
       lines.push(`+ ${item.path}`);
     }
   }
+
+  lines.push(...installedLines);
 
   for (const stalePath of stale) {
     lines.push(`! ${stalePath} (managed previously but no longer part of the current base set)`);
