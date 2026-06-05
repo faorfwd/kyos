@@ -2,7 +2,6 @@ const path = require("path");
 
 const FRAMEWORK_NAME = "kyos";
 const FRAMEWORK_PACKAGE = "kyos-cli";
-const FRAMEWORK_VERSION = "0.2.10";
 const STATE_ROOT = ".kyos";
 const CLAUDE_ROOT = ".claude";
 const MANAGED_ROOT = path.posix.join(STATE_ROOT, "claude");
@@ -21,7 +20,6 @@ module.exports = {
   CLAUDE_ROOT,
   FRAMEWORK_NAME,
   FRAMEWORK_PACKAGE,
-  FRAMEWORK_VERSION,
   LOCK_FILE,
   MANAGED_ROOT,
   MCP_CONFIG_FILE,

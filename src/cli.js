@@ -1,8 +1,8 @@
 const {
   FRAMEWORK_NAME,
-  FRAMEWORK_VERSION,
   USER_CONFIG_FILE,
 } = require("./core/constants");
+const { version: FRAMEWORK_VERSION } = require("../package.json");
 const {
   addCapability,
   runApply,

@@ -404,8 +404,7 @@ module.exports = function register(test) {
     assert.equal(result.ok, true);
 
     const settings = JSON.parse(fs.readFileSync(path.join(cwd, ".claude", "settings.json"), "utf8"));
-    assert.ok(settings.mcpServers && settings.mcpServers.context7, "context7 entry should exist in mcpServers");
-    assert.equal(settings.mcpServers.context7.url, "https://mcp.context7.com/mcp");
+    assert.ok(settings.enabledPlugins && settings.enabledPlugins.context7 === true, "context7 entry should exist in enabledPlugins");
     assert.ok(settings.permissions, "existing settings keys must be preserved");
 
     const config = JSON.parse(fs.readFileSync(path.join(cwd, ".kyos", "config.json"), "utf8"));
@@ -421,7 +420,7 @@ module.exports = function register(test) {
     assert.equal(result.ok, true);
 
     const settings = JSON.parse(fs.readFileSync(path.join(cwd, ".claude", "settings.json"), "utf8"));
-    assert.ok(settings.mcpServers && settings.mcpServers.context7, "context7 entry should exist");
+    assert.ok(settings.enabledPlugins && settings.enabledPlugins.context7 === true, "context7 entry should exist");
   });
 
   test("add mcp accumulates multiple MCPs without overwriting earlier ones", () => {
@@ -432,8 +431,8 @@ module.exports = function register(test) {
     addCapability({ cwd, type: "mcp", name: "filesystem" });
 
     const settings = JSON.parse(fs.readFileSync(path.join(cwd, ".claude", "settings.json"), "utf8"));
-    assert.ok(settings.mcpServers.context7, "context7 must still be present");
-    assert.ok(settings.mcpServers.filesystem, "filesystem must be present");
+    assert.ok(settings.enabledPlugins.context7 === true, "context7 must still be present");
+    assert.ok(settings.enabledPlugins.filesystem === true, "filesystem must be present");
     assert.ok(settings.permissions, "other settings keys must be preserved");
   });
 
@@ -445,7 +444,7 @@ module.exports = function register(test) {
     addCapability({ cwd, type: "mcp", name: "context7" });
 
     const settings = JSON.parse(fs.readFileSync(path.join(cwd, ".claude", "settings.json"), "utf8"));
-    assert.equal(Object.keys(settings.mcpServers).length, 1, "mcpServers should have exactly one entry");
+    assert.equal(Object.keys(settings.enabledPlugins).length, 1, "enabledPlugins should have exactly one entry");
 
     const config = JSON.parse(fs.readFileSync(path.join(cwd, ".kyos", "config.json"), "utf8"));
     assert.equal(config.installed.mcps.filter((n) => n === "context7").length, 1, "installed.mcps should not duplicate");
@@ -501,14 +500,14 @@ module.exports = function register(test) {
     // remove the mcp entry from settings to simulate fresh clone
     const settingsPath = path.join(cwd, ".claude", "settings.json");
     const settings = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
-    delete settings.mcpServers.context7;
+    delete settings.enabledPlugins.context7;
     fs.writeFileSync(settingsPath, JSON.stringify(settings), "utf8");
 
     const result = runApply({ cwd });
     assert.equal(result.ok, true);
 
     const after = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
-    assert.ok(after.mcpServers && after.mcpServers.context7, "context7 should be re-registered by --apply");
+    assert.ok(after.enabledPlugins && after.enabledPlugins.context7 === true, "context7 should be re-registered by --apply");
     assert.ok(result.lines.some((l) => String(l).includes("context7")));
   });
 
