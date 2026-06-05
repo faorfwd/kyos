@@ -24,6 +24,7 @@
   "mcps": {
     "context7": {
       "description": "Up-to-date code and library documentation via Context7 MCP.",
+      "pluginId": "context7@claude-plugins-official",
       "definition": {
         "url": "https://mcp.context7.com/mcp"
       },

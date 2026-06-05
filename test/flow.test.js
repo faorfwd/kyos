@@ -404,7 +404,7 @@ module.exports = function register(test) {
     assert.equal(result.ok, true);
 
     const settings = JSON.parse(fs.readFileSync(path.join(cwd, ".claude", "settings.json"), "utf8"));
-    assert.ok(settings.enabledPlugins && settings.enabledPlugins.context7 === true, "context7 entry should exist in enabledPlugins");
+    assert.ok(settings.enabledPlugins && settings.enabledPlugins["context7@claude-plugins-official"] === true, "context7 entry should exist in enabledPlugins");
     assert.ok(settings.permissions, "existing settings keys must be preserved");
 
     const config = JSON.parse(fs.readFileSync(path.join(cwd, ".kyos", "config.json"), "utf8"));
@@ -420,7 +420,7 @@ module.exports = function register(test) {
     assert.equal(result.ok, true);
 
     const settings = JSON.parse(fs.readFileSync(path.join(cwd, ".claude", "settings.json"), "utf8"));
-    assert.ok(settings.enabledPlugins && settings.enabledPlugins.context7 === true, "context7 entry should exist");
+    assert.ok(settings.enabledPlugins && settings.enabledPlugins["context7@claude-plugins-official"] === true, "context7 entry should exist");
   });
 
   test("add mcp accumulates multiple MCPs without overwriting earlier ones", () => {
@@ -431,7 +431,7 @@ module.exports = function register(test) {
     addCapability({ cwd, type: "mcp", name: "filesystem" });
 
     const settings = JSON.parse(fs.readFileSync(path.join(cwd, ".claude", "settings.json"), "utf8"));
-    assert.ok(settings.enabledPlugins.context7 === true, "context7 must still be present");
+    assert.ok(settings.enabledPlugins["context7@claude-plugins-official"] === true, "context7 must still be present");
     assert.ok(settings.enabledPlugins.filesystem === true, "filesystem must be present");
     assert.ok(settings.permissions, "other settings keys must be preserved");
   });
@@ -500,14 +500,14 @@ module.exports = function register(test) {
     // remove the mcp entry from settings to simulate fresh clone
     const settingsPath = path.join(cwd, ".claude", "settings.json");
     const settings = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
-    delete settings.enabledPlugins.context7;
+    delete settings.enabledPlugins["context7@claude-plugins-official"];
     fs.writeFileSync(settingsPath, JSON.stringify(settings), "utf8");
 
     const result = runApply({ cwd });
     assert.equal(result.ok, true);
 
     const after = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
-    assert.ok(after.enabledPlugins && after.enabledPlugins.context7 === true, "context7 should be re-registered by --apply");
+    assert.ok(after.enabledPlugins && after.enabledPlugins["context7@claude-plugins-official"] === true, "context7 should be re-registered by --apply");
     assert.ok(result.lines.some((l) => String(l).includes("context7")));
   });
 
