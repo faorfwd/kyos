@@ -599,9 +599,10 @@ function addCapability({ cwd, type, name }) {
       };
     }
 
+    const pluginId = capability.pluginId || name;
     const mcpConfig = loadMcpConfig(cwd);
     mcpConfig.enabledPlugins = mcpConfig.enabledPlugins || {};
-    mcpConfig.enabledPlugins[name] = true;
+    mcpConfig.enabledPlugins[pluginId] = true;
     saveMcpConfig(cwd, mcpConfig);
     addInstalledCapability(config, "mcps", name);
     saveUserConfig(cwd, config);
@@ -766,10 +767,11 @@ function replayInstalledCapabilities({ cwd, config }) {
     const mcpConfig = loadMcpConfig(cwd);
     let changed = false;
     for (const name of mcpNames) {
-      if (!mcpConfig.enabledPlugins[name]) {
-        const capability = getCapability(catalog, "mcp", name);
+      const capability = getCapability(catalog, "mcp", name);
+      const pluginId = (capability && capability.pluginId) || name;
+      if (!mcpConfig.enabledPlugins[pluginId]) {
         if (capability) {
-          mcpConfig.enabledPlugins[name] = true;
+          mcpConfig.enabledPlugins[pluginId] = true;
           changed = true;
           lines.push(`+ mcp:${name}`);
         }
