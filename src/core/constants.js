@@ -10,7 +10,7 @@ const CLAUDE_MD_FILE = "CLAUDE.md";
 const LOCK_FILE = path.posix.join(STATE_ROOT, "lock.json");
 const VERSION_FILE = path.posix.join(STATE_ROOT, "version.json");
 const USER_CONFIG_FILE = path.posix.join(STATE_ROOT, "config.json");
-const MCP_CONFIG_FILE = ".mcp.json";
+const MCP_CONFIG_FILE = path.posix.join(CLAUDE_ROOT, "settings.json");
 const CATALOG_DIR = path.resolve(__dirname, "../../catalog");
 const CATALOG_FILE = path.join(CATALOG_DIR, "registry.json");
 

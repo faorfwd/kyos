@@ -16,7 +16,7 @@ npx kyos-cli --init
 
 - Sets up a base Claude Code structure in your project — commands, workflow steps, and a config.
 - Safe to run on an existing project: it shows you what it would change before doing anything.
-- Run `--apply` to add only what's missing, or `--init --force` to start fresh.
+- Run `kyos-cli --apply` to add only what's missing, or `kyos-cli --init --force` to start fresh.
 
 ## The workflow
 
