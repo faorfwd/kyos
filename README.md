@@ -67,7 +67,7 @@ Three commands sit outside the main chain. Reach for them when the repo needs a 
 | `kyos-cli --init --force` | Reset everything to a clean baseline |
 | `kyos-cli --apply` | Add only missing files, never overwrites anything |
 | `kyos-cli --update` | Pull in the latest managed files without touching your customizations |
-| `kyos-cli --add <type> <name>` | Add a skill, agent, or MCP from the catalog |
+| `kyos-cli --add <type> <name>` | Add a skill, agent, MCP or hook from the catalog |
 | `kyos-cli --doctor` | Check that everything is in order |
 
 ## Catalog
@@ -80,6 +80,8 @@ kyos-cli --add skill silent-execution # Cuts Claude's narration dramatically —
 
 kyos-cli --add mcp context7          # Gives Claude up-to-date docs for libraries and frameworks you use
 kyos-cli --add mcp filesystem        # Lets Claude read and write files outside the project directory
+
+kyos-cli --add hook repo-sandbox     # Blocks Claude's attempts to access paths outside of current repo root
 ```
 
 MCP entries are wired up automatically.
