@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { spawnSync } = require("child_process");
 const { getCapability, loadCatalog } = require("./catalog");
 const {
   CLAUDE_MD_FILE,
@@ -14,6 +15,7 @@ const {
 const {
   addInstalledCapability,
   ensureBaseHooks,
+  installHookWiring,
   loadMcpConfig,
   loadUserConfig,
   saveMcpConfig,
@@ -549,11 +551,37 @@ function runDoctor({ cwd }) {
       `installed skills: ${(config.installed.skills || []).length}`,
       `installed agents: ${(config.installed.agents || []).length}`,
       `installed mcps: ${(config.installed.mcps || []).length}`,
+      `installed hooks: ${(config.installed.hooks || []).length}`,
       ...commandReport,
     ],
     warnings,
     errors,
   };
+}
+
+function pickRuntime(runtimes) {
+  for (const runtime of runtimes) {
+    const [cmd, ...args] = runtime.probe;
+    try {
+      const result = spawnSync(cmd, args, { stdio: "ignore", timeout: 5000 });
+      if (!result.error && result.status === 0) return runtime;
+    } catch {
+      // probe failed, try next
+    }
+  }
+  return runtimes[runtimes.length - 1];
+}
+
+function installHook({ cwd, name, capability }) {
+  const runtime = pickRuntime(capability.runtimes);
+  const scriptRelativePath = `${capability.installDir}/${runtime.script}`;
+  const catalogScriptPath = path.join(CATALOG_DIR, "hooks", name, runtime.script);
+  const scriptContent = fs.readFileSync(catalogScriptPath, "utf8");
+  writeRepoTextFile(cwd, scriptRelativePath, scriptContent);
+  const absoluteScriptPath = resolveRepoPath(cwd, scriptRelativePath);
+  const command = runtime.command.replace("{scriptPath}", absoluteScriptPath);
+  installHookWiring(cwd, { event: capability.event, matcher: capability.matcher, command });
+  return { runtime, command };
 }
 
 function addCapability({ cwd, type, name }) {
@@ -612,6 +640,25 @@ function addCapability({ cwd, type, name }) {
     };
   }
 
+  if (normalizedType === "hook") {
+    if (!capability) {
+      return {
+        ok: false,
+        errors: [`Unknown hook '${name}'. Add it to catalog/registry.json first.`],
+      };
+    }
+
+    const { runtime } = installHook({ cwd, name, capability });
+    addInstalledCapability(config, "hooks", name);
+    saveUserConfig(cwd, config);
+
+    return {
+      ok: true,
+      summary: `installed hook '${name}' using ${runtime.name}`,
+      lines: capability.notes ? capability.notes.map((line) => `- ${line}`) : [],
+    };
+  }
+
   let targetRelativePath;
   if (normalizedType === "skill") {
     targetRelativePath = `${CLAUDE_ROOT}/skills/${name}/SKILL.md`;
@@ -630,7 +677,7 @@ function addCapability({ cwd, type, name }) {
 }
 
 function normalizeCapabilityType(type) {
-  if (type === "skill" || type === "agent" || type === "mcp") {
+  if (type === "skill" || type === "agent" || type === "mcp" || type === "hook") {
     return type;
   }
 
@@ -757,6 +804,30 @@ function replayInstalledCapabilities({ cwd, config }) {
       const capability = getCapability(catalog, "agent", name);
       writeRepoTextFile(cwd, targetPath, createOverrideTemplate({ type: "agent", name, capability }));
       lines.push(`+ ${targetPath}`);
+    }
+  }
+
+  for (const name of (config.installed.hooks || [])) {
+    const capability = getCapability(catalog, "hook", name);
+    if (!capability) continue;
+
+    const runtime = pickRuntime(capability.runtimes);
+    const scriptRelativePath = `${capability.installDir}/${runtime.script}`;
+    const absoluteScriptPath = resolveRepoPath(cwd, scriptRelativePath);
+    const command = runtime.command.replace("{scriptPath}", absoluteScriptPath);
+
+    const scriptMissing = !fs.existsSync(resolveRepoPath(cwd, scriptRelativePath));
+    const settings = readJsonIfExists(path.resolve(cwd, MCP_CONFIG_FILE)) || {};
+    const eventEntries = (settings.hooks && settings.hooks[capability.event]) || [];
+    const wired = eventEntries.some(
+      (e) => e.matcher === capability.matcher &&
+              Array.isArray(e.hooks) &&
+              e.hooks.some((h) => h.command === command)
+    );
+
+    if (scriptMissing || !wired) {
+      installHook({ cwd, name, capability });
+      lines.push(`+ hook:${name}`);
     }
   }
 

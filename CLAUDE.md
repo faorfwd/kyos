@@ -13,7 +13,7 @@ npm test                        # Run integration tests (test/flow.test.js)
 npm start                       # Equivalent to: node ./bin/kyos.js --init
 node ./bin/kyos.js --init       # Bootstrap or analyze existing setup
 node ./bin/kyos.js --update     # Force-rewrite .kyos/ to current baseline
-node ./bin/kyos.js --add <type> <name>  # Add capability (skill/agent/mcp)
+node ./bin/kyos.js --add <type> <name>  # Add capability (skill/agent/mcp/hook)
 ```
 
 ## Architecture
@@ -62,6 +62,7 @@ Defines available capabilities that can be added with `--add`:
 - **Skills**: `release-notes`, `security-audit`, `path-safety`, `mcp-hardening`, `secrets-and-supply-chain`
 - **Agents**: `triage`
 - **MCPs**: `context7`, `filesystem`
+- **Hooks**: `repo-sandbox` — `PreToolUse` guard blocking tool calls whose paths resolve outside the repo root. Script sources live in `catalog/hooks/<name>/`. The installer copies the chosen runtime's script to `.claude/hooks/` and wires the event into `.claude/settings.json`.
 
 ## Working Rules
 

@@ -21,6 +21,32 @@
     }
   },
   "agents": {},
+  "hooks": {
+    "repo-sandbox": {
+      "description": "PreToolUse guard that blocks tool calls touching paths outside the current repo.",
+      "event": "PreToolUse",
+      "matcher": "Read|Edit|Write|NotebookEdit|MultiEdit|Bash|PowerShell",
+      "installDir": ".claude/hooks",
+      "runtimes": [
+        {
+          "name": "pwsh",
+          "probe": ["pwsh", "-NoProfile", "-Command", "exit 0"],
+          "script": "repo-sandbox.ps1",
+          "command": "pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{scriptPath}\""
+        },
+        {
+          "name": "node",
+          "probe": ["node", "-e", "process.exit(0)"],
+          "script": "repo-sandbox.js",
+          "command": "node \"{scriptPath}\""
+        }
+      ],
+      "notes": [
+        "Blocks file and shell tool calls whose resolved paths fall outside the repo root.",
+        "Bypass a legitimate case via user approval, or edit .claude/hooks/repo-sandbox.* directly."
+      ]
+    }
+  },
   "mcps": {
     "context7": {
       "description": "Up-to-date code and library documentation via Context7 MCP.",

@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 
 const { runApply, runBootstrap, runDoctor, runUpdateKyos, addCapability } = require("../src/core/workflows");
 const { ensureBaseHooks } = require("../src/core/config");
@@ -653,5 +654,150 @@ module.exports = function register(test) {
 
     assert.equal(fs.readFileSync(settingsPath, "utf8"), settingsBefore, "settings.json must not be modified");
     assert.ok(!result.lines.some((l) => String(l).includes("context7")), "no line for already-registered mcp");
+  });
+
+  // ── Hook tests (T7) ────────────────────────────────────────────────────────
+
+  test("add hook repo-sandbox installs script and wires PreToolUse entry", () => {
+    const cwd = mkTempDir("kyos-add-hook-");
+    runBootstrap({ cwd, apply: false });
+
+    const result = addCapability({ cwd, type: "hook", name: "repo-sandbox" });
+    assert.equal(result.ok, true, `expected ok:true, got: ${result.errors}`);
+    assert.ok(result.summary.includes("installed hook 'repo-sandbox'"));
+
+    // Script was copied (js or ps1 depending on runtime)
+    const hasJs = exists(cwd, ".claude/hooks/repo-sandbox.js");
+    const hasPs1 = exists(cwd, ".claude/hooks/repo-sandbox.ps1");
+    assert.ok(hasJs || hasPs1, "at least one hook script must be installed");
+
+    // Script must not contain obsidian-vault or any hardcoded absolute root
+    const scriptPath = hasPs1
+      ? path.join(cwd, ".claude", "hooks", "repo-sandbox.ps1")
+      : path.join(cwd, ".claude", "hooks", "repo-sandbox.js");
+    const scriptContent = fs.readFileSync(scriptPath, "utf8");
+    assert.ok(!scriptContent.includes("obsidian-vault"), "script must not contain obsidian-vault");
+    assert.ok(!scriptContent.includes("c:\\git-repo\\kyos"), "script must not embed absolute repo root");
+    assert.ok(!scriptContent.includes("c:/git-repo/kyos"), "script must not embed absolute repo root");
+
+    // Script uses self-resolving root
+    if (hasPs1) {
+      assert.ok(scriptContent.includes("$PSScriptRoot"), "ps1 must resolve root from $PSScriptRoot");
+    } else {
+      assert.ok(scriptContent.includes("__dirname"), "js must resolve root from __dirname");
+    }
+  });
+
+  test("add hook repo-sandbox wires PreToolUse in settings.json, preserves PostToolUse", () => {
+    const cwd = mkTempDir("kyos-hook-settings-");
+    runBootstrap({ cwd, apply: false });
+    addCapability({ cwd, type: "hook", name: "repo-sandbox" });
+
+    const settings = JSON.parse(fs.readFileSync(path.join(cwd, ".claude", "settings.json"), "utf8"));
+    assert.ok(Array.isArray(settings.hooks?.PreToolUse), "hooks.PreToolUse must be an array");
+    const entry = settings.hooks.PreToolUse.find((h) => h.matcher === "Read|Edit|Write|NotebookEdit|MultiEdit|Bash|PowerShell");
+    assert.ok(entry, "must have PreToolUse entry with the sandbox matcher");
+    assert.ok(Array.isArray(entry.hooks) && entry.hooks.length > 0, "entry must have hooks");
+    assert.equal(entry.hooks[0].type, "command");
+    assert.ok(entry.hooks[0].command.includes("repo-sandbox"), "command must reference repo-sandbox script");
+
+    // PostToolUse Agent hook must still be there
+    assert.ok(Array.isArray(settings.hooks?.PostToolUse), "PostToolUse must survive hook install");
+    assert.ok(settings.hooks.PostToolUse.some((h) => h.matcher === "Agent"), "Agent PostToolUse hook must be preserved");
+  });
+
+  test("add hook repo-sandbox records in config.json installed.hooks", () => {
+    const cwd = mkTempDir("kyos-hook-config-");
+    runBootstrap({ cwd, apply: false });
+    addCapability({ cwd, type: "hook", name: "repo-sandbox" });
+
+    const config = JSON.parse(fs.readFileSync(path.join(cwd, ".kyos", "config.json"), "utf8"));
+    assert.ok(Array.isArray(config.installed.hooks), "installed.hooks must be an array");
+    assert.ok(config.installed.hooks.includes("repo-sandbox"), "installed.hooks must contain repo-sandbox");
+  });
+
+  test("add hook repo-sandbox is idempotent (no duplicate settings or config entries)", () => {
+    const cwd = mkTempDir("kyos-hook-idempotent-");
+    runBootstrap({ cwd, apply: false });
+
+    addCapability({ cwd, type: "hook", name: "repo-sandbox" });
+    addCapability({ cwd, type: "hook", name: "repo-sandbox" });
+
+    const settings = JSON.parse(fs.readFileSync(path.join(cwd, ".claude", "settings.json"), "utf8"));
+    const preToolUse = settings.hooks?.PreToolUse || [];
+    const sandboxEntries = preToolUse.filter((h) => h.matcher === "Read|Edit|Write|NotebookEdit|MultiEdit|Bash|PowerShell");
+    assert.equal(sandboxEntries.length, 1, "must have exactly one PreToolUse sandbox entry after two installs");
+
+    const config = JSON.parse(fs.readFileSync(path.join(cwd, ".kyos", "config.json"), "utf8"));
+    const hookCount = (config.installed.hooks || []).filter((n) => n === "repo-sandbox").length;
+    assert.equal(hookCount, 1, "installed.hooks must not duplicate repo-sandbox");
+  });
+
+  test("add hook unknown name returns ok:false with clear error", () => {
+    const cwd = mkTempDir("kyos-hook-unknown-");
+    runBootstrap({ cwd, apply: false });
+
+    const result = addCapability({ cwd, type: "hook", name: "nope" });
+    assert.equal(result.ok, false);
+    assert.ok(result.errors && result.errors.some((e) => e.includes("nope") && e.includes("catalog/registry.json")));
+  });
+
+  test("--apply replays hook when settings entry is missing", () => {
+    const cwd = mkTempDir("kyos-hook-replay-");
+    runBootstrap({ cwd, apply: false });
+    addCapability({ cwd, type: "hook", name: "repo-sandbox" });
+
+    // Remove the PreToolUse entry to simulate fresh clone
+    const settingsPath = path.join(cwd, ".claude", "settings.json");
+    const settings = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+    delete settings.hooks.PreToolUse;
+    fs.writeFileSync(settingsPath, JSON.stringify(settings), "utf8");
+
+    const result = runApply({ cwd });
+    assert.equal(result.ok, true);
+
+    const after = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+    assert.ok(Array.isArray(after.hooks?.PreToolUse), "PreToolUse must be restored by --apply");
+    assert.ok(
+      after.hooks.PreToolUse.some((h) => h.matcher === "Read|Edit|Write|NotebookEdit|MultiEdit|Bash|PowerShell"),
+      "sandbox entry must be restored"
+    );
+    assert.ok(result.lines.some((l) => String(l).includes("repo-sandbox")), "result must mention repo-sandbox");
+  });
+
+  test("installed node script blocks outside-path payload and allows inside-path", (t) => {
+    const cwd = mkTempDir("kyos-hook-behavioral-");
+    runBootstrap({ cwd, apply: false });
+    addCapability({ cwd, type: "hook", name: "repo-sandbox" });
+
+    const scriptPath = path.join(cwd, ".claude", "hooks", "repo-sandbox.js");
+    if (!exists(cwd, ".claude/hooks/repo-sandbox.js")) {
+      t.skip("node script not installed (pwsh was selected as runtime)");
+      return;
+    }
+
+    const outsidePayload = JSON.stringify({
+      tool_name: "Read",
+      tool_input: { file_path: "C:/some/other/repo/secret.txt" },
+    });
+    const blocked = spawnSync("node", [scriptPath], { input: outsidePayload, encoding: "utf8" });
+    assert.equal(blocked.status, 2, "outside path must be blocked with exit code 2");
+    assert.ok(blocked.stderr && blocked.stderr.includes("repo-sandbox"), "stderr must mention repo-sandbox");
+
+    const insidePayload = JSON.stringify({
+      tool_name: "Read",
+      tool_input: { file_path: path.join(cwd, "README.md") },
+    });
+    const allowed = spawnSync("node", [scriptPath], { input: insidePayload, encoding: "utf8" });
+    assert.equal(allowed.status, 0, "inside path must be allowed with exit code 0");
+  });
+
+  test("doctor reports installed hooks count", () => {
+    const cwd = mkTempDir("kyos-hook-doctor-");
+    runBootstrap({ cwd, apply: false });
+    addCapability({ cwd, type: "hook", name: "repo-sandbox" });
+
+    const doctor = runDoctor({ cwd });
+    assert.ok(doctor.lines.some((l) => String(l).includes("installed hooks: 1")), "doctor must report installed hooks count");
   });
 };
