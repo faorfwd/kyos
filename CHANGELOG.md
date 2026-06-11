@@ -3,6 +3,13 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.2.0] - 2026-06-11
+### Changed
+- fix(ci): publish to npm on version tag push instead of GitHub release
+- chore: updating README with hooksinformation
+- feat: add support for hooks with repo-sandbox capability and related functionality
+- Potential fix for code scanning alert no. 1: Workflow does not contain permissions
+
 ## [0.3.4] - 2026-04-27
 ### Changed
 - fix: move /kyos:release command to repo-local .claude — not a catalog export
