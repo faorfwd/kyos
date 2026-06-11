@@ -3,7 +3,7 @@
   "modules": {
     "claude-base": {
       "description": "Shared Claude Code baseline structure and conventions for every repository.",
-      "version": "0.3.4"
+      "version": "1.2.0"
     }
   },
   "baseline": {
@@ -30,13 +30,22 @@
       "runtimes": [
         {
           "name": "pwsh",
-          "probe": ["pwsh", "-NoProfile", "-Command", "exit 0"],
+          "probe": [
+            "pwsh",
+            "-NoProfile",
+            "-Command",
+            "exit 0"
+          ],
           "script": "repo-sandbox.ps1",
           "command": "pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{scriptPath}\""
         },
         {
           "name": "node",
-          "probe": ["node", "-e", "process.exit(0)"],
+          "probe": [
+            "node",
+            "-e",
+            "process.exit(0)"
+          ],
           "script": "repo-sandbox.js",
           "command": "node \"{scriptPath}\""
         }

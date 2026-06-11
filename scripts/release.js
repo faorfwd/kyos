@@ -109,4 +109,5 @@ run(`git commit -m "${commitMsg}"`);
 run(`git tag ${tag}`);
 
 console.log(`\nreleased ${tag}`);
-console.log(`push with: git push && git push --tags`);
+console.log(`publish by pushing: git push && git push --tags`);
+console.log(`(the tag push triggers .github/workflows/publish.yml → npm publish)`);
