@@ -13,6 +13,7 @@ function getDefaultConfig(repoName) {
     extends: ["claude-base"],
     installed: {
       agents: [],
+      hooks: [],
       mcps: [],
       skills: [],
     },
@@ -61,21 +62,38 @@ const BASE_AGENT_HOOK = {
   ],
 };
 
+function mergeSettingsHookEntry(existing, event, entry) {
+  const eventEntries = (existing.hooks && existing.hooks[event]) || [];
+  return {
+    ...existing,
+    hooks: {
+      ...(existing.hooks || {}),
+      [event]: [...eventEntries, entry],
+    },
+  };
+}
+
 function ensureBaseHooks(cwd) {
   const existing = readJsonIfExists(path.resolve(cwd, MCP_CONFIG_FILE)) || {};
   const postToolUse = (existing.hooks && existing.hooks.PostToolUse) || [];
   if (postToolUse.some((entry) => entry.matcher === "Agent")) {
     return false;
   }
-  const merged = {
-    ...existing,
-    hooks: {
-      ...(existing.hooks || {}),
-      PostToolUse: [...postToolUse, BASE_AGENT_HOOK],
-    },
-  };
-  writeRepoTextFile(cwd, MCP_CONFIG_FILE, stableStringify(merged));
+  writeRepoTextFile(cwd, MCP_CONFIG_FILE, stableStringify(mergeSettingsHookEntry(existing, "PostToolUse", BASE_AGENT_HOOK)));
   return true;
+}
+
+function installHookWiring(cwd, { event, matcher, command }) {
+  const existing = readJsonIfExists(path.resolve(cwd, MCP_CONFIG_FILE)) || {};
+  const eventEntries = (existing.hooks && existing.hooks[event]) || [];
+  const alreadyWired = eventEntries.some(
+    (e) => e.matcher === matcher &&
+            Array.isArray(e.hooks) &&
+            e.hooks.some((h) => h.command === command)
+  );
+  if (alreadyWired) return;
+  const entry = { matcher, hooks: [{ type: "command", command }] };
+  writeRepoTextFile(cwd, MCP_CONFIG_FILE, stableStringify(mergeSettingsHookEntry(existing, event, entry)));
 }
 
 function addInstalledCapability(config, type, name) {
@@ -95,6 +113,7 @@ module.exports = {
   addInstalledCapability,
   ensureBaseHooks,
   getDefaultConfig,
+  installHookWiring,
   loadMcpConfig,
   loadUserConfig,
   saveMcpConfig,

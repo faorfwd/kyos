@@ -18,7 +18,7 @@ Usage:
   kyos-cli --init [--force]
   kyos-cli --apply
   kyos-cli --update
-  kyos-cli --add <skill|agent|mcp> <name>
+  kyos-cli --add <skill|agent|mcp|hook> <name>
   kyos-cli --doctor
 Notes:
   - Commands run against the current working directory only.
@@ -27,7 +27,7 @@ Notes:
   - Use '--apply' to write managed files that are missing from the repo (create-only, never overwrites existing files).
   - Use '--update' to forcibly rewrite only .kyos/ to the current baseline (destructive to .kyos only).
   - Use '--force' with '--init' to reset .claude/, .kyos/, and CLAUDE.md to the current managed baseline (destructive).
-  - Use '--add' to install a skill, agent, or MCP from the catalog.
+  - Use '--add' to install a skill, agent, MCP, or hook from the catalog.
   - Use '--doctor' to check managed file integrity and report drift.
   - Managed state lives in .kyos/.
   - Managed source files live in .kyos/claude/, while repo customizations live in .claude/.
@@ -108,7 +108,7 @@ async function main() {
     if (!type || !name) {
       printResult({
         ok: false,
-        errors: ["Usage: kyos --add <skill|agent|mcp> <name>"],
+        errors: ["Usage: kyos --add <skill|agent|mcp|hook> <name>"],
       });
       return;
     }
