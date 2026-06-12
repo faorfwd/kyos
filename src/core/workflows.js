@@ -6,6 +6,7 @@ const {
   CLAUDE_MD_FILE,
   CLAUDE_ROOT,
   CATALOG_DIR,
+  HOOK_MARKER_PREFIX,
   LOCK_FILE,
   MANAGED_ROOT,
   MCP_CONFIG_FILE,
@@ -15,6 +16,7 @@ const {
 const {
   addInstalledCapability,
   ensureBaseHooks,
+  hookMarker,
   installHookWiring,
   loadMcpConfig,
   loadUserConfig,
@@ -30,6 +32,7 @@ const {
   loadLock,
   planManagedChanges,
   renderManagedFiles,
+  writeVersionStamp,
 } = require("./managed-files");
 
 function readFrontmatterField(absolutePath, field) {
@@ -238,6 +241,7 @@ function runBootstrap({ cwd, apply, force }) {
     applyManagedChanges({ cwd, plan });
     applyLocalClaudeSeed({ cwd, plan: localSeedPlan });
     ensureBaseHooks(cwd);
+    writeVersionStamp(cwd, repoName);
     ensureGitignoreHasKyos({ cwd });
   }
 
@@ -429,6 +433,7 @@ function runUpdateKyos({ cwd }) {
   const currentLock = loadLock(cwd);
   const plan = planManagedChanges({ cwd, desiredFiles: kyosOnlyFiles, currentLock });
   applyManagedChanges({ cwd, plan });
+  writeVersionStamp(cwd, repoName);
   ensureGitignoreHasKyos({ cwd });
 
   const created = plan.results.filter((item) => item.action === "create").length;
@@ -572,16 +577,33 @@ function pickRuntime(runtimes) {
   return runtimes[runtimes.length - 1];
 }
 
-function installHook({ cwd, name, capability }) {
-  const runtime = pickRuntime(capability.runtimes);
-  const scriptRelativePath = `${capability.installDir}/${runtime.script}`;
+// ${CLAUDE_PROJECT_DIR} is expanded by Claude Code before the command is spawned,
+// so the wired entry stays machine-independent. The trailing shell comment marks
+// the entry as kyos-owned (both documented hook shells, bash and powershell,
+// treat # as a comment).
+function buildHookCommand(runtime, scriptRelativePath, name) {
+  const portable = runtime.command.replace("{scriptPath}", `\${CLAUDE_PROJECT_DIR}/${scriptRelativePath}`);
+  return `${portable} # ${hookMarker(name)}`;
+}
+
+function writeHookScript(cwd, name, runtime, scriptRelativePath) {
   const catalogScriptPath = path.join(CATALOG_DIR, "hooks", name, runtime.script);
   const scriptContent = fs.readFileSync(catalogScriptPath, "utf8");
   writeRepoTextFile(cwd, scriptRelativePath, scriptContent);
-  const absoluteScriptPath = resolveRepoPath(cwd, scriptRelativePath);
-  const command = runtime.command.replace("{scriptPath}", absoluteScriptPath);
-  installHookWiring(cwd, { event: capability.event, matcher: capability.matcher, command });
-  return { runtime, command };
+}
+
+function installHook({ cwd, name, capability }) {
+  const runtime = pickRuntime(capability.runtimes);
+  const scriptRelativePath = `${capability.installDir}/${runtime.script}`;
+  writeHookScript(cwd, name, runtime, scriptRelativePath);
+  const command = buildHookCommand(runtime, scriptRelativePath, name);
+  const wiring = installHookWiring(cwd, {
+    event: capability.event,
+    matcher: capability.matcher,
+    command,
+    marker: hookMarker(name),
+  });
+  return { runtime, command, wiring };
 }
 
 function addCapability({ cwd, type, name }) {
@@ -813,20 +835,44 @@ function replayInstalledCapabilities({ cwd, config }) {
 
     const runtime = pickRuntime(capability.runtimes);
     const scriptRelativePath = `${capability.installDir}/${runtime.script}`;
-    const absoluteScriptPath = resolveRepoPath(cwd, scriptRelativePath);
-    const command = runtime.command.replace("{scriptPath}", absoluteScriptPath);
+    const command = buildHookCommand(runtime, scriptRelativePath, name);
 
-    const scriptMissing = !fs.existsSync(resolveRepoPath(cwd, scriptRelativePath));
+    // One-generation migration: pre-marker releases wired an unmarked entry with
+    // an absolute script path. Same matcher + kyos script basename + no marker is
+    // unambiguously ours — remove it; the marked portable entry replaces it below.
     const settings = readJsonIfExists(path.resolve(cwd, MCP_CONFIG_FILE)) || {};
     const eventEntries = (settings.hooks && settings.hooks[capability.event]) || [];
-    const wired = eventEntries.some(
-      (e) => e.matcher === capability.matcher &&
-              Array.isArray(e.hooks) &&
-              e.hooks.some((h) => h.command === command)
-    );
+    const isLegacy = (e) => e.matcher === capability.matcher &&
+      Array.isArray(e.hooks) &&
+      e.hooks.some((h) =>
+        typeof h.command === "string" &&
+        h.command.includes(runtime.script) &&
+        !h.command.includes(HOOK_MARKER_PREFIX));
+    const hasLegacy = eventEntries.some(isLegacy);
+    if (hasLegacy) {
+      writeRepoTextFile(cwd, MCP_CONFIG_FILE, stableStringify({
+        ...settings,
+        hooks: {
+          ...(settings.hooks || {}),
+          [capability.event]: eventEntries.filter((e) => !isLegacy(e)),
+        },
+      }));
+    }
 
-    if (scriptMissing || !wired) {
-      installHook({ cwd, name, capability });
+    const scriptMissing = !fs.existsSync(resolveRepoPath(cwd, scriptRelativePath));
+    if (scriptMissing) {
+      writeHookScript(cwd, name, runtime, scriptRelativePath);
+    }
+    const wiring = installHookWiring(cwd, {
+      event: capability.event,
+      matcher: capability.matcher,
+      command,
+      marker: hookMarker(name),
+    });
+
+    if (hasLegacy || wiring.action === "updated") {
+      lines.push(`~ hook:${name} rewired (portable)`);
+    } else if (scriptMissing || wiring.action === "added") {
       lines.push(`+ hook:${name}`);
     }
   }
@@ -876,6 +922,7 @@ function runApply({ cwd }) {
   applyManagedChanges({ cwd, plan: { results: createOnlyResults, finalLockFiles: createOnlyLockFiles } });
   applyLocalClaudeSeed({ cwd, plan: localSeedPlan });
   ensureBaseHooks(cwd);
+  writeVersionStamp(cwd, repoName);
   const installedLines = replayInstalledCapabilities({ cwd, config });
   ensureGitignoreHasKyos({ cwd });
 

@@ -765,6 +765,180 @@ module.exports = function register(test) {
     assert.ok(result.lines.some((l) => String(l).includes("repo-sandbox")), "result must mention repo-sandbox");
   });
 
+  function getSandboxEntry(cwd) {
+    const settings = JSON.parse(fs.readFileSync(path.join(cwd, ".claude", "settings.json"), "utf8"));
+    const entries = (settings.hooks?.PreToolUse || []).filter(
+      (h) => h.matcher === "Read|Edit|Write|NotebookEdit|MultiEdit|Bash|PowerShell"
+    );
+    return { settings, entries };
+  }
+
+  function writeSettings(cwd, settings) {
+    fs.writeFileSync(path.join(cwd, ".claude", "settings.json"), JSON.stringify(settings), "utf8");
+  }
+
+  test("hook command is portable and marked (no absolute path)", () => {
+    const cwd = mkTempDir("kyos-hook-portable-");
+    runBootstrap({ cwd, apply: false });
+    addCapability({ cwd, type: "hook", name: "repo-sandbox" });
+
+    const { entries } = getSandboxEntry(cwd);
+    assert.equal(entries.length, 1);
+    const command = entries[0].hooks[0].command;
+    assert.ok(
+      command.includes("${CLAUDE_PROJECT_DIR}/.claude/hooks/repo-sandbox."),
+      "command must reference the script via ${CLAUDE_PROJECT_DIR}"
+    );
+    assert.ok(command.includes(" # managedBy=kyos/repo-sandbox"), "command must carry the kyos marker comment");
+    assert.ok(!command.includes(cwd), "command must not contain the absolute repo path");
+  });
+
+  test("--apply rewrites a hand-edited marked hook command in place", () => {
+    const cwd = mkTempDir("kyos-hook-selfheal-");
+    runBootstrap({ cwd, apply: false });
+    addCapability({ cwd, type: "hook", name: "repo-sandbox" });
+
+    const { settings, entries } = getSandboxEntry(cwd);
+    entries[0].hooks[0].command = "echo broken # managedBy=kyos/repo-sandbox";
+    writeSettings(cwd, settings);
+
+    const result = runApply({ cwd });
+
+    const after = getSandboxEntry(cwd);
+    assert.equal(after.entries.length, 1, "still exactly one sandbox entry");
+    assert.ok(
+      after.entries[0].hooks[0].command.includes("${CLAUDE_PROJECT_DIR}"),
+      "command must be restored to canonical portable form"
+    );
+    assert.ok(result.lines.some((l) => String(l).includes("~ hook:repo-sandbox")), "must report the rewire");
+  });
+
+  test("--apply dedupes duplicated marked hook entries", () => {
+    const cwd = mkTempDir("kyos-hook-dedupe-");
+    runBootstrap({ cwd, apply: false });
+    addCapability({ cwd, type: "hook", name: "repo-sandbox" });
+
+    const { settings, entries } = getSandboxEntry(cwd);
+    settings.hooks.PreToolUse.push(JSON.parse(JSON.stringify(entries[0])));
+    writeSettings(cwd, settings);
+
+    runApply({ cwd });
+
+    const after = getSandboxEntry(cwd);
+    assert.equal(after.entries.length, 1, "duplicated marked entries must be deduped to one");
+  });
+
+  test("--apply migrates legacy absolute-path hook wiring in place", () => {
+    const cwd = mkTempDir("kyos-hook-legacy-");
+    runBootstrap({ cwd, apply: false });
+    addCapability({ cwd, type: "hook", name: "repo-sandbox" });
+
+    // Rewrite the wired entry the way pre-marker releases did: absolute path, no marker.
+    const { settings, entries } = getSandboxEntry(cwd);
+    const command = entries[0].hooks[0].command;
+    const legacyCommand = command
+      .replace(" # managedBy=kyos/repo-sandbox", "")
+      .replace("${CLAUDE_PROJECT_DIR}", cwd.replace(/\\/g, "/"));
+    entries[0].hooks[0].command = legacyCommand;
+    writeSettings(cwd, settings);
+
+    const result = runApply({ cwd });
+
+    const after = getSandboxEntry(cwd);
+    assert.equal(after.entries.length, 1, "legacy entry must be replaced, not duplicated");
+    const afterCommand = after.entries[0].hooks[0].command;
+    assert.ok(afterCommand.includes("${CLAUDE_PROJECT_DIR}"), "replacement must be portable");
+    assert.ok(afterCommand.includes("managedBy=kyos/repo-sandbox"), "replacement must be marked");
+    assert.ok(result.lines.some((l) => String(l).includes("~ hook:repo-sandbox")), "must report the migration");
+  });
+
+  test("--apply leaves foreign same-matcher entries untouched", () => {
+    const cwd = mkTempDir("kyos-hook-foreign-");
+    runBootstrap({ cwd, apply: false });
+    addCapability({ cwd, type: "hook", name: "repo-sandbox" });
+
+    const { settings } = getSandboxEntry(cwd);
+    const foreign = {
+      matcher: "Read|Edit|Write|NotebookEdit|MultiEdit|Bash|PowerShell",
+      hooks: [{ type: "command", command: "echo my-own-guard" }],
+    };
+    settings.hooks.PreToolUse.push(foreign);
+    writeSettings(cwd, settings);
+
+    runApply({ cwd });
+
+    const after = getSandboxEntry(cwd);
+    assert.equal(after.entries.length, 2, "foreign entry must survive alongside the marked one");
+    assert.ok(
+      after.entries.some((e) => e.hooks[0].command === "echo my-own-guard"),
+      "foreign command must be unchanged"
+    );
+  });
+
+  test("base Agent hook is marked and self-heals when payload is edited", () => {
+    const cwd = mkTempDir("kyos-base-hook-marker-");
+    runBootstrap({ cwd, apply: false });
+
+    const settingsPath = path.join(cwd, ".claude", "settings.json");
+    const settings = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+    const agentEntry = settings.hooks.PostToolUse.find((h) => h.matcher === "Agent");
+    assert.ok(
+      agentEntry.hooks[0].command.includes("# managedBy=kyos/base-agent"),
+      "base Agent hook command must carry the kyos marker"
+    );
+
+    agentEntry.hooks[0].command = "echo tampered # managedBy=kyos/base-agent";
+    fs.writeFileSync(settingsPath, JSON.stringify(settings), "utf8");
+
+    const changed = ensureBaseHooks(cwd);
+    assert.equal(changed, true, "must report the repair");
+    const after = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+    const repaired = after.hooks.PostToolUse.find((h) => h.matcher === "Agent");
+    assert.ok(repaired.hooks[0].command.includes("hookSpecificOutput"), "payload must be restored");
+  });
+
+  test("ensureBaseHooks migrates the legacy unmarked Agent hook in place", () => {
+    const cwd = mkTempDir("kyos-base-hook-legacy-");
+    fs.mkdirSync(path.join(cwd, ".claude"), { recursive: true });
+    const legacyCommand =
+      "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"PROCESS RULE: A subagent just completed. If the user now reports a bug or issue with its output, re-spawn the SAME agent type via the Agent tool — do NOT call Edit or Write inline. Only fix inline if it is a single-line typo or wiring mistake faster to correct than to brief an agent (per .claude/rules/process.md).\"}}' ";
+    const initial = {
+      hooks: { PostToolUse: [{ matcher: "Agent", hooks: [{ type: "command", command: legacyCommand }] }] },
+    };
+    fs.writeFileSync(path.join(cwd, ".claude", "settings.json"), JSON.stringify(initial), "utf8");
+
+    const changed = ensureBaseHooks(cwd);
+
+    assert.equal(changed, true, "legacy entry must be migrated");
+    const after = JSON.parse(fs.readFileSync(path.join(cwd, ".claude", "settings.json"), "utf8"));
+    const agentEntries = after.hooks.PostToolUse.filter((h) => h.matcher === "Agent");
+    assert.equal(agentEntries.length, 1, "no duplicate Agent entry");
+    assert.ok(
+      agentEntries[0].hooks[0].command.includes("# managedBy=kyos/base-agent"),
+      "migrated entry must carry the marker"
+    );
+  });
+
+  test("version stamp is written on init and refreshed by --apply", () => {
+    const cwd = mkTempDir("kyos-version-stamp-");
+    runBootstrap({ cwd, apply: false });
+
+    const { version: currentVersion } = require("../package.json");
+    const stampPath = path.join(cwd, ".kyos", "version.json");
+    const stamp = JSON.parse(fs.readFileSync(stampPath, "utf8"));
+    assert.equal(stamp.version, currentVersion, "stamp must record the running kyos version");
+
+    stamp.version = "0.0.1";
+    fs.writeFileSync(stampPath, JSON.stringify(stamp), "utf8");
+    runApply({ cwd });
+
+    const refreshed = JSON.parse(fs.readFileSync(stampPath, "utf8"));
+    assert.equal(refreshed.version, currentVersion, "--apply must refresh the stamp to the running version");
+
+    const lock = JSON.parse(fs.readFileSync(path.join(cwd, ".kyos", "lock.json"), "utf8"));
+    assert.ok(!Object.keys(lock.files || {}).includes(".kyos/version.json"), "version.json must not be a checksummed managed file");
+  });
+
   test("installed node script blocks outside-path payload and allows inside-path", (t) => {
     const cwd = mkTempDir("kyos-hook-behavioral-");
     runBootstrap({ cwd, apply: false });
