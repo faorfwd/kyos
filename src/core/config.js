@@ -1,12 +1,14 @@
+const fs = require("fs");
 const path = require("path");
 const {
   FRAMEWORK_PACKAGE,
   FRAMEWORK_VERSION,
   HOOK_MARKER_PREFIX,
+  LEGACY_USER_CONFIG_FILE,
   MCP_CONFIG_FILE,
   USER_CONFIG_FILE,
 } = require("./constants");
-const { readJsonIfExists, writeRepoTextFile } = require("./fs");
+const { readJsonIfExists, resolveRepoPath, writeRepoTextFile } = require("./fs");
 const { stableStringify } = require("./json");
 
 function getDefaultConfig(repoName) {
@@ -33,13 +35,19 @@ function getDefaultConfig(repoName) {
 }
 
 function loadUserConfig(cwd, repoName) {
-  const configPath = path.resolve(cwd, USER_CONFIG_FILE);
-  const config = readJsonIfExists(configPath);
-  return config || getDefaultConfig(repoName);
+  const config = readJsonIfExists(path.resolve(cwd, USER_CONFIG_FILE));
+  if (config) return config;
+  // Fall back to the pre-1.4 location so existing repos keep working until they
+  // migrate (via --doctor --fix or any write of the new config).
+  const legacy = readJsonIfExists(path.resolve(cwd, LEGACY_USER_CONFIG_FILE));
+  return legacy || getDefaultConfig(repoName);
 }
 
 function saveUserConfig(cwd, config) {
   writeRepoTextFile(cwd, USER_CONFIG_FILE, stableStringify(config));
+  // Any write migrates a pre-1.4 repo: drop the gitignored legacy copy so it can't
+  // drift from the committable kyos.json. No-op when the legacy file is absent.
+  fs.rmSync(resolveRepoPath(cwd, LEGACY_USER_CONFIG_FILE), { force: true });
 }
 
 function loadMcpConfig(cwd) {

@@ -3,6 +3,12 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.3.1] - 2026-06-18
+### Changed
+- docs(spec): prefer tracked issue key as spec slug when present
+- fix(config): make user config portable via repo-root kyos.json
+- test: avoid incomplete regex escape in stale-version assertion
+
 ## [1.3.0] - 2026-06-13
 ### Changed
 - feat: package-aware hook marker + duplicate detection in doctor

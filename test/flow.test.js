@@ -30,7 +30,7 @@ module.exports = function register(test) {
     const result = runBootstrap({ cwd, apply: false });
 
     assert.equal(result.ok, true);
-    assert.ok(exists(cwd, ".kyos/config.json"));
+    assert.ok(exists(cwd, "kyos.json"));
     assert.ok(exists(cwd, ".kyos/lock.json"));
     assert.ok(exists(cwd, ".claude/settings.json"));
     assert.ok(exists(cwd, ".kyos/claude/rules/README.md"));
@@ -99,7 +99,7 @@ module.exports = function register(test) {
     fs.mkdirSync(settingsPath, { recursive: true });
     // plant enough structure so detectExistingClaudeSetup returns true
     fs.mkdirSync(path.join(cwd, ".kyos"), { recursive: true });
-    fs.writeFileSync(path.join(cwd, ".kyos", "config.json"), JSON.stringify({}), "utf8");
+    fs.writeFileSync(path.join(cwd, "kyos.json"), JSON.stringify({}), "utf8");
     const existing = {
       permissions: { defaultMode: "allow" },
       hooks: { PostToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "echo done" }] }] },
@@ -304,8 +304,8 @@ module.exports = function register(test) {
     );
     assert.equal(fs.readFileSync(managedSpecPath, "utf8"), catalogSpec);
 
-    // .kyos/config.json must survive the reset
-    assert.ok(exists(cwd, ".kyos/config.json"), ".kyos/config.json should not be deleted by --update");
+    // kyos.json lives at the repo root, outside .kyos, so --update never touches it
+    assert.ok(exists(cwd, "kyos.json"), "kyos.json should not be deleted by --update");
   });
 
   test("--update preserves user config across reset", () => {
@@ -315,7 +315,7 @@ module.exports = function register(test) {
     // Add a capability so config.json has non-default content
     addCapability({ cwd, type: "skill", name: "release-notes" });
 
-    const configPath = path.join(cwd, ".kyos", "config.json");
+    const configPath = path.join(cwd, "kyos.json");
     const configBefore = JSON.parse(fs.readFileSync(configPath, "utf8"));
     assert.ok(configBefore.installed.skills.includes("release-notes"));
 
@@ -498,7 +498,7 @@ module.exports = function register(test) {
     assert.equal(result.ok, true);
     assert.ok(exists(cwd, ".claude/agents/triage.md"));
 
-    const config = JSON.parse(fs.readFileSync(path.join(cwd, ".kyos", "config.json"), "utf8"));
+    const config = JSON.parse(fs.readFileSync(path.join(cwd, "kyos.json"), "utf8"));
     assert.ok((config.installed.agents || []).includes("triage"));
   });
 
@@ -513,7 +513,7 @@ module.exports = function register(test) {
     assert.ok(settings.enabledPlugins && settings.enabledPlugins["context7@claude-plugins-official"] === true, "context7 entry should exist in enabledPlugins");
     assert.ok(settings.permissions, "existing settings keys must be preserved");
 
-    const config = JSON.parse(fs.readFileSync(path.join(cwd, ".kyos", "config.json"), "utf8"));
+    const config = JSON.parse(fs.readFileSync(path.join(cwd, "kyos.json"), "utf8"));
     assert.ok((config.installed.mcps || []).includes("context7"));
   });
 
@@ -552,7 +552,7 @@ module.exports = function register(test) {
     const settings = JSON.parse(fs.readFileSync(path.join(cwd, ".claude", "settings.json"), "utf8"));
     assert.equal(Object.keys(settings.enabledPlugins).length, 1, "enabledPlugins should have exactly one entry");
 
-    const config = JSON.parse(fs.readFileSync(path.join(cwd, ".kyos", "config.json"), "utf8"));
+    const config = JSON.parse(fs.readFileSync(path.join(cwd, "kyos.json"), "utf8"));
     assert.equal(config.installed.mcps.filter((n) => n === "context7").length, 1, "installed.mcps should not duplicate");
   });
 
@@ -563,7 +563,7 @@ module.exports = function register(test) {
     const result = addCapability({ cwd, type: "skill", name: "path-safety" });
     assert.equal(result.ok, true);
 
-    const config = JSON.parse(fs.readFileSync(path.join(cwd, ".kyos", "config.json"), "utf8"));
+    const config = JSON.parse(fs.readFileSync(path.join(cwd, "kyos.json"), "utf8"));
     assert.ok((config.installed.skills || []).includes("path-safety"));
   });
 
@@ -719,9 +719,77 @@ module.exports = function register(test) {
     runBootstrap({ cwd, apply: false });
     addCapability({ cwd, type: "hook", name: "repo-sandbox" });
 
-    const config = JSON.parse(fs.readFileSync(path.join(cwd, ".kyos", "config.json"), "utf8"));
+    const config = JSON.parse(fs.readFileSync(path.join(cwd, "kyos.json"), "utf8"));
     assert.ok(Array.isArray(config.installed.hooks), "installed.hooks must be an array");
     assert.ok(config.installed.hooks.includes("repo-sandbox"), "installed.hooks must contain repo-sandbox");
+  });
+
+  test("--update migrates a legacy .kyos/config.json to kyos.json and removes the old copy", () => {
+    const cwd = mkTempDir("kyos-config-migrate-");
+    runBootstrap({ cwd, apply: false });
+
+    // Simulate a pre-1.4 repo: move the config back into the gitignored state dir.
+    const newPath = path.join(cwd, "kyos.json");
+    const original = fs.readFileSync(newPath, "utf8");
+    fs.writeFileSync(path.join(cwd, ".kyos", "config.json"), original, "utf8");
+    fs.rmSync(newPath);
+
+    const result = runUpdateKyos({ cwd });
+
+    assert.ok(result.lines.some((l) => l.includes("config migrated")));
+    assert.ok(exists(cwd, "kyos.json"), "kyos.json must exist after --update");
+    assert.ok(!exists(cwd, ".kyos/config.json"), "legacy config must be removed after --update");
+    assert.deepEqual(
+      JSON.parse(fs.readFileSync(newPath, "utf8")),
+      JSON.parse(original),
+      "migrated config content must match the original"
+    );
+  });
+
+  test("plain --doctor reports a legacy config but changes nothing", () => {
+    const cwd = mkTempDir("kyos-config-doctor-report-");
+    runBootstrap({ cwd, apply: false });
+
+    const newPath = path.join(cwd, "kyos.json");
+    fs.writeFileSync(path.join(cwd, ".kyos", "config.json"), fs.readFileSync(newPath, "utf8"), "utf8");
+    fs.rmSync(newPath);
+
+    const report = runDoctor({ cwd });
+    assert.ok(report.warnings.some((w) => w.includes(".kyos/config.json") && w.includes("--update")));
+    assert.ok(exists(cwd, ".kyos/config.json"), "doctor must not move the legacy config");
+    assert.ok(!exists(cwd, "kyos.json"), "doctor must not create kyos.json");
+  });
+
+  test("loadUserConfig falls back to legacy .kyos/config.json when kyos.json is absent", () => {
+    const cwd = mkTempDir("kyos-config-fallback-");
+    runBootstrap({ cwd, apply: false });
+    addCapability({ cwd, type: "skill", name: "release-notes" });
+
+    // Move the config to the legacy location without migrating.
+    const newPath = path.join(cwd, "kyos.json");
+    fs.writeFileSync(path.join(cwd, ".kyos", "config.json"), fs.readFileSync(newPath, "utf8"), "utf8");
+    fs.rmSync(newPath);
+
+    // doctor reads via the fallback, so the installed skill count is still reported.
+    const report = runDoctor({ cwd });
+    assert.ok(report.lines.some((l) => l === "installed skills: 1"));
+  });
+
+  test("any config write (e.g. --add) migrates a legacy .kyos/config.json to kyos.json", () => {
+    const cwd = mkTempDir("kyos-config-autom-");
+    runBootstrap({ cwd, apply: false });
+
+    // Simulate a pre-1.4 repo: config only at the legacy location.
+    const newPath = path.join(cwd, "kyos.json");
+    fs.writeFileSync(path.join(cwd, ".kyos", "config.json"), fs.readFileSync(newPath, "utf8"), "utf8");
+    fs.rmSync(newPath);
+
+    addCapability({ cwd, type: "skill", name: "release-notes" });
+
+    assert.ok(exists(cwd, "kyos.json"), "kyos.json must be created on the write");
+    assert.ok(!exists(cwd, ".kyos/config.json"), "legacy config must be removed on the write");
+    const config = JSON.parse(fs.readFileSync(newPath, "utf8"));
+    assert.ok((config.installed.skills || []).includes("release-notes"));
   });
 
   test("add hook repo-sandbox is idempotent (no duplicate settings or config entries)", () => {
@@ -736,7 +804,7 @@ module.exports = function register(test) {
     const sandboxEntries = preToolUse.filter((h) => h.matcher === "Read|Edit|Write|NotebookEdit|MultiEdit|Bash|PowerShell");
     assert.equal(sandboxEntries.length, 1, "must have exactly one PreToolUse sandbox entry after two installs");
 
-    const config = JSON.parse(fs.readFileSync(path.join(cwd, ".kyos", "config.json"), "utf8"));
+    const config = JSON.parse(fs.readFileSync(path.join(cwd, "kyos.json"), "utf8"));
     const hookCount = (config.installed.hooks || []).filter((n) => n === "repo-sandbox").length;
     assert.equal(hookCount, 1, "installed.hooks must not duplicate repo-sandbox");
   });

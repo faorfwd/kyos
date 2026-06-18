@@ -40,7 +40,7 @@ Changes to managed files are planned (create/update/conflict/blocked) before bei
 | `core/workflows.js` | All top-level operations: bootstrap, apply, update, doctor, add-capability, hook install |
 | `core/managed-files.js` | Checksum-based diff/merge: `planManagedChanges()` → `applyManagedChanges()` |
 | `core/fs.js` | Safe filesystem I/O; validates all paths against traversal/symlink attacks |
-| `core/config.js` | Reads/writes `.kyos/config.json` and `.mcp.json` |
+| `core/config.js` | Reads/writes `kyos.json` (repo-root, committable) and `.mcp.json` |
 | `core/catalog.js` | Loads `catalog/registry.json` and looks up skills/agents/MCPs |
 | `core/json.js` | JSON read/write helpers |
 | `core/hash.js` | SHA256 hashing for integrity checks |

@@ -7,6 +7,7 @@ const {
   CLAUDE_ROOT,
   CATALOG_DIR,
   FRAMEWORK_VERSION,
+  LEGACY_USER_CONFIG_FILE,
   LOCK_FILE,
   MANAGED_ROOT,
   MCP_CONFIG_FILE,
@@ -77,7 +78,7 @@ function isPathWithinRoot(rootPath, candidatePath) {
 
 function forceResetBootstrap({ cwd }) {
   const rootReal = fs.realpathSync.native(cwd);
-  const targets = [CLAUDE_ROOT, ".kyos", CLAUDE_MD_FILE];
+  const targets = [CLAUDE_ROOT, ".kyos", CLAUDE_MD_FILE, USER_CONFIG_FILE];
 
   for (const relativePath of targets) {
     const absolutePath = resolveRepoPath(cwd, relativePath);
@@ -430,6 +431,18 @@ function runUpdateKyos({ cwd }) {
   forceResetKyosOnly({ cwd });
 
   const config = loadUserConfig(cwd, repoName);
+
+  // Heal a pre-1.4 layout as part of the upgrade: move the gitignored
+  // .kyos/config.json to the committable repo-root kyos.json. saveUserConfig drops
+  // the legacy copy. Done here so users never run an extra migration command.
+  const configLines = [];
+  const hasNewConfig = Boolean(readJsonIfExists(resolveRepoPath(cwd, USER_CONFIG_FILE)));
+  const hasLegacyConfig = Boolean(readJsonIfExists(resolveRepoPath(cwd, LEGACY_USER_CONFIG_FILE)));
+  if (!hasNewConfig && hasLegacyConfig) {
+    saveUserConfig(cwd, config);
+    configLines.push(`~ config migrated ${LEGACY_USER_CONFIG_FILE} -> ${USER_CONFIG_FILE}`);
+  }
+
   const desiredFiles = renderManagedFiles({ cwd, config });
   const kyosOnlyFiles = Object.fromEntries(
     Object.entries(desiredFiles).filter(([relativePath]) => relativePath === STATE_ROOT || relativePath.startsWith(`${STATE_ROOT}/`))
@@ -460,6 +473,7 @@ function runUpdateKyos({ cwd }) {
     }
     return `${symbolForAction(item.action)} ${item.path}`;
   });
+  lines.push(...configLines);
   lines.push(...hookLines);
 
   return {
@@ -493,8 +507,16 @@ function runDoctor({ cwd, fix = false }) {
   const stale = findStaleManagedFiles(cwd, desiredFiles, currentLock);
   const hasExistingClaudeSetup = detectExistingClaudeSetup(cwd);
 
-  if (!readJsonIfExists(resolveRepoPath(cwd, USER_CONFIG_FILE))) {
+  const hasNewConfig = Boolean(readJsonIfExists(resolveRepoPath(cwd, USER_CONFIG_FILE)));
+  const hasLegacyConfig = Boolean(readJsonIfExists(resolveRepoPath(cwd, LEGACY_USER_CONFIG_FILE)));
+
+  if (!hasNewConfig && !hasLegacyConfig) {
     warnings.push(`${USER_CONFIG_FILE} is missing. Run 'npx kyos-cli --init' to create it.`);
+  } else if (!hasNewConfig && hasLegacyConfig) {
+    // Read-only report; the migration itself happens automatically during --update.
+    warnings.push(
+      `${LEGACY_USER_CONFIG_FILE} is gitignored and won't travel to other machines; run --update to migrate it to ${USER_CONFIG_FILE}.`
+    );
   }
 
   if (!readJsonIfExists(resolveRepoPath(cwd, LOCK_FILE))) {
