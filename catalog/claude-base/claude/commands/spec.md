@@ -84,7 +84,10 @@ Only include links that exist. When updating a sibling artefact, append the sect
 
 Create a dedicated execution folder for this spec, then write the spec into a repo-owned markdown file so it can be reviewed and committed.
 
-1. Pick a short, path-safe spec slug (lowercase, hyphenated), e.g. `oauth-login` or `csv-import`.
+1. Choose the spec slug:
+   - **If the request references a tracked work item** (Jira/Linear/GitHub issue, etc.), prefer the issue key as the slug, e.g. `JT-222` or `PROJ-1043`. Match keys like `ABC-123` from the argument, a pasted URL, or a branch name. Preserve the key's original case.
+   - **Otherwise**, pick a short, path-safe description slug (lowercase, hyphenated), e.g. `oauth-login` or `csv-import`.
+   - When both are present, prefer the issue key only `JT-222`.
 2. Create: `docs/execution/<spec-slug>/`
 3. Write the spec to:
    - `docs/execution/<spec-slug>/spec.md`
