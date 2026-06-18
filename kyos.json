@@ -1,0 +1,23 @@
+{
+  "$schema": "https://example.com/kyos.schema.json",
+  "extends": [
+    "claude-base"
+  ],
+  "installed": {
+    "agents": [],
+    "mcps": [
+      "context7"
+    ],
+    "skills": []
+  },
+  "paths": {
+    "claudeMd": "CLAUDE.md",
+    "customClaudeDir": ".claude",
+    "managedSourceDir": ".kyos/claude"
+  },
+  "policy": {
+    "analyzeExistingBeforeApply": true,
+    "neverOverwriteUnmanagedFiles": true
+  },
+  "repoName": "kyos"
+}
