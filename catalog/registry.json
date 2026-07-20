@@ -8,9 +8,7 @@
   },
   "baseline": {
     "skills": [],
-    "agents": [
-      "product-manager"
-    ]
+    "agents": []
   },
   "skills": {
     "critic": {

@@ -4,7 +4,17 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
-const { runApply, runBootstrap, runDoctor, runUpdateKyos, addCapability } = require("../src/core/workflows");
+const {
+  runApply,
+  runBootstrap,
+  runDoctor,
+  runUpdateKyos,
+  addCapability,
+  assertSeededAgentsHaveDefinitions,
+  managedAgentWrapper,
+  managedSkillWrapper,
+} = require("../src/core/workflows");
+const { listCatalogMarkdown, listCatalogSkills } = require("../src/core/managed-files");
 const {
   ensureBaseHooks,
   parseOwnedHookName,
@@ -38,13 +48,12 @@ module.exports = function register(test) {
 
     assert.ok(exists(cwd, ".kyos/claude/commands/README.md"));
     assert.ok(exists(cwd, ".kyos/claude/commands/spec.md"));
-    assert.ok(exists(cwd, ".kyos/claude/agents/security-engineer.md"));
+    assert.ok(exists(cwd, ".kyos/claude/agents/README.md"));
     assert.ok(exists(cwd, ".kyos/claude/skills/silent-execution/SKILL.md"));
 
     assert.ok(exists(cwd, ".claude/commands/README.md"));
     assert.ok(exists(cwd, ".claude/commands/spec.md"));
     assert.ok(exists(cwd, ".claude/commands/architecture.md"));
-    assert.equal(exists(cwd, ".claude/agents/security-engineer.md"), false);
 
     const managedSpec = fs.readFileSync(path.join(cwd, ".kyos", "claude", "commands", "spec.md"), "utf8");
     const localSpec = fs.readFileSync(path.join(cwd, ".claude", "commands", "spec.md"), "utf8");
@@ -313,11 +322,11 @@ module.exports = function register(test) {
     runBootstrap({ cwd, apply: false });
 
     // Add a capability so config.json has non-default content
-    addCapability({ cwd, type: "skill", name: "release-notes" });
+    addCapability({ cwd, type: "skill", name: "critic" });
 
     const configPath = path.join(cwd, "kyos.json");
     const configBefore = JSON.parse(fs.readFileSync(configPath, "utf8"));
-    assert.ok(configBefore.installed.skills.includes("release-notes"));
+    assert.ok(configBefore.installed.skills.includes("critic"));
 
     runUpdateKyos({ cwd });
 
@@ -351,9 +360,9 @@ module.exports = function register(test) {
     const cwd = mkTempDir("kyos-flow-");
     runBootstrap({ cwd, apply: false });
 
-    const result = addCapability({ cwd, type: "skill", name: "release-notes" });
+    const result = addCapability({ cwd, type: "skill", name: "critic" });
     assert.equal(result.ok, true);
-    assert.ok(exists(cwd, ".claude/skills/release-notes/SKILL.md"));
+    assert.ok(exists(cwd, ".claude/skills/critic/SKILL.md"));
   });
 
   test("--apply on a fresh dir with no Claude setup returns info and does nothing", () => {
@@ -490,16 +499,117 @@ module.exports = function register(test) {
     assert.ok(result.lines.some((line) => String(line).includes("spec.md")));
   });
 
-  test("add agent creates a local stub and records in config", () => {
-    const cwd = mkTempDir("kyos-add-agent-");
+  test("add rejects a skill or agent the package does not ship", () => {
+    const cwd = mkTempDir("kyos-add-unknown-");
     runBootstrap({ cwd, apply: false });
 
-    const result = addCapability({ cwd, type: "agent", name: "triage" });
-    assert.equal(result.ok, true);
-    assert.ok(exists(cwd, ".claude/agents/triage.md"));
+    for (const type of ["skill", "agent"]) {
+      const result = addCapability({ cwd, type, name: "not-in-the-catalog" });
+      assert.equal(result.ok, false, `--add ${type} must reject an unknown name`);
+      assert.ok(result.errors.some((e) => e.includes("catalog/registry.json")), "error should point at the registry");
+      assert.equal(exists(cwd, `.claude/agents/not-in-the-catalog.md`), false);
+      assert.equal(exists(cwd, `.claude/skills/not-in-the-catalog/SKILL.md`), false);
+    }
 
     const config = JSON.parse(fs.readFileSync(path.join(cwd, "kyos.json"), "utf8"));
-    assert.ok((config.installed.agents || []).includes("triage"));
+    assert.ok(!(config.installed.agents || []).includes("not-in-the-catalog"));
+    assert.ok(!(config.installed.skills || []).includes("not-in-the-catalog"));
+  });
+
+  test("wrappers take their title from the definition they wrap", () => {
+    const catalogRoot = path.join(__dirname, "..", "catalog", "claude-base", "claude");
+    const headingOf = (abs) => {
+      const body = fs.readFileSync(abs, "utf8").replace(/\r\n/g, "\n").replace(/^---\n[\s\S]*?\n---\n/, "");
+      return body.match(/^#\s+(.+)$/m)[1].trim();
+    };
+
+    for (const relativePath of listCatalogSkills()) {
+      const wrapper = managedSkillWrapper(relativePath);
+      const expected = headingOf(path.join(catalogRoot, "skills", ...relativePath.split("/")));
+      assert.ok(
+        wrapper.includes(`# ${expected}\n`),
+        `skill wrapper for ${relativePath} should be titled "${expected}", got: ${wrapper.split("\n").find((l) => l.startsWith("# "))}`
+      );
+    }
+
+    for (const filename of listCatalogMarkdown("agents")) {
+      const wrapper = managedAgentWrapper(filename);
+      const expected = headingOf(path.join(catalogRoot, "agents", filename));
+      assert.ok(wrapper.includes(`# ${expected}\n`), `agent wrapper for ${filename} should be titled "${expected}"`);
+    }
+  });
+
+  test("wrappers never invent frontmatter the definition does not declare", () => {
+    // A wrapper declaring model:/skills: silently overrides how the agent runs. Agents in this
+    // catalog carry no frontmatter, so their wrappers must carry none either.
+    for (const filename of listCatalogMarkdown("agents")) {
+      const wrapper = managedAgentWrapper(filename);
+      assert.ok(!wrapper.startsWith("---"), `agent wrapper for ${filename} must not add frontmatter`);
+      assert.ok(!wrapper.includes("model:"), `agent wrapper for ${filename} must not pin a model`);
+      assert.ok(!wrapper.includes("skills:"), `agent wrapper for ${filename} must not inject skills`);
+    }
+
+    // Skills do declare frontmatter, and it must be copied from the source verbatim.
+    for (const relativePath of listCatalogSkills()) {
+      const wrapper = managedSkillWrapper(relativePath);
+      const source = fs
+        .readFileSync(path.join(__dirname, "..", "catalog", "claude-base", "claude", "skills", ...relativePath.split("/")), "utf8")
+        .replace(/\r\n/g, "\n");
+      const block = source.slice(0, source.indexOf("\n---\n", 3) + 5);
+      assert.ok(wrapper.startsWith(block), `skill wrapper for ${relativePath} must copy source frontmatter verbatim`);
+    }
+  });
+
+  test("seeded agents must have a catalog definition", () => {
+    // The product-manager bug: baseline listed an agent the catalog never rendered, so every
+    // repo got a wrapper whose "Full definition" link dangled.
+    assert.throws(
+      () => assertSeededAgentsHaveDefinitions(["ghost-agent.md"]),
+      /no catalog definition: ghost-agent\.md/,
+      "a seeded agent with no definition must fail loudly"
+    );
+
+    // The real baseline must satisfy the invariant.
+    const catalogAgents = listCatalogMarkdown("agents");
+    assert.doesNotThrow(() => assertSeededAgentsHaveDefinitions(catalogAgents));
+    assert.doesNotThrow(() => assertSeededAgentsHaveDefinitions([]));
+  });
+
+  test("the managed set is derived from the catalog, not hardcoded", () => {
+    const cwd = mkTempDir("kyos-derived-managed-");
+    runBootstrap({ cwd, apply: false });
+
+    for (const filename of listCatalogMarkdown("agents")) {
+      assert.ok(exists(cwd, `.kyos/claude/agents/${filename}`), `agent ${filename} must render`);
+    }
+    for (const filename of listCatalogMarkdown("commands")) {
+      assert.ok(exists(cwd, `.kyos/claude/commands/${filename}`), `command ${filename} must render`);
+    }
+    for (const relativePath of listCatalogSkills()) {
+      assert.ok(exists(cwd, `.kyos/claude/skills/${relativePath}`), `skill ${relativePath} must render`);
+    }
+
+    // project-context.md is generated, not copied, so it must stay out of the catalog dir.
+    assert.ok(
+      !listCatalogMarkdown("commands").includes("project-context.md"),
+      "project-context.md is generated and must not be added to the catalog commands dir"
+    );
+    assert.ok(exists(cwd, ".kyos/claude/commands/project-context.md"), "generated command still renders");
+  });
+
+  test("--init seeds no agent wrappers while baseline.agents is empty", () => {
+    const cwd = mkTempDir("kyos-no-baseline-agents-");
+    runBootstrap({ cwd, apply: false });
+
+    const agentsDir = path.join(cwd, ".claude", "agents");
+    const seeded = fs.existsSync(agentsDir)
+      ? fs.readdirSync(agentsDir).filter((f) => f !== "README.md")
+      : [];
+    assert.deepEqual(seeded, [], `no agent wrappers expected, got ${JSON.stringify(seeded)}`);
+
+    // The catalog ships no agent definitions, so nothing renders into the managed layer either.
+    const managed = listCatalogMarkdown("agents").filter((f) => f !== "README.md");
+    assert.deepEqual(managed, [], `no catalog agent definitions expected, got ${JSON.stringify(managed)}`);
   });
 
   test("add mcp writes to .claude/settings.json and records in config", () => {
@@ -560,42 +670,46 @@ module.exports = function register(test) {
     const cwd = mkTempDir("kyos-add-skill-config-");
     runBootstrap({ cwd, apply: false });
 
-    const result = addCapability({ cwd, type: "skill", name: "path-safety" });
+    const result = addCapability({ cwd, type: "skill", name: "silent-execution" });
     assert.equal(result.ok, true);
 
     const config = JSON.parse(fs.readFileSync(path.join(cwd, "kyos.json"), "utf8"));
-    assert.ok((config.installed.skills || []).includes("path-safety"));
+    assert.ok((config.installed.skills || []).includes("silent-execution"));
   });
 
   test("--apply replays installed skill stub when .claude file is missing", () => {
     const cwd = mkTempDir("kyos-apply-installed-skill-");
     runBootstrap({ cwd, apply: false });
-    addCapability({ cwd, type: "skill", name: "release-notes" });
+    addCapability({ cwd, type: "skill", name: "critic" });
 
     // simulate fresh clone: remove the .claude stub that --add wrote
-    const stubPath = path.join(cwd, ".claude", "skills", "release-notes", "SKILL.md");
+    const stubPath = path.join(cwd, ".claude", "skills", "critic", "SKILL.md");
     fs.rmSync(stubPath);
-    assert.equal(exists(cwd, ".claude/skills/release-notes/SKILL.md"), false);
+    assert.equal(exists(cwd, ".claude/skills/critic/SKILL.md"), false);
 
     const result = runApply({ cwd });
     assert.equal(result.ok, true);
-    assert.ok(exists(cwd, ".claude/skills/release-notes/SKILL.md"), "stub should be recreated by --apply");
-    assert.ok(result.lines.some((l) => String(l).includes("release-notes")));
+    assert.ok(exists(cwd, ".claude/skills/critic/SKILL.md"), "stub should be recreated by --apply");
+    assert.ok(result.lines.some((l) => String(l).includes("critic")));
   });
 
-  test("--apply replays installed agent stub when .claude file is missing", () => {
-    const cwd = mkTempDir("kyos-apply-installed-agent-");
+  test("--apply reports an orphaned capability instead of fabricating a stub", () => {
+    const cwd = mkTempDir("kyos-apply-orphan-agent-");
     runBootstrap({ cwd, apply: false });
-    addCapability({ cwd, type: "agent", name: "triage" });
 
-    const stubPath = path.join(cwd, ".claude", "agents", "triage.md");
-    fs.rmSync(stubPath);
-    assert.equal(exists(cwd, ".claude/agents/triage.md"), false);
+    // Simulate a repo whose config records a capability the registry no longer defines.
+    const configPath = path.join(cwd, "kyos.json");
+    const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    config.installed.agents = [...(config.installed.agents || []), "retired-agent"];
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), "utf8");
 
     const result = runApply({ cwd });
     assert.equal(result.ok, true);
-    assert.ok(exists(cwd, ".claude/agents/triage.md"), "agent stub should be recreated by --apply");
-    assert.ok(result.lines.some((l) => String(l).includes("triage")));
+    assert.equal(exists(cwd, ".claude/agents/retired-agent.md"), false, "must not invent a stub for an unknown name");
+    assert.ok(
+      result.lines.some((l) => String(l).includes("retired-agent") && String(l).startsWith("!")),
+      `expected an orphan report line: ${JSON.stringify(result.lines)}`
+    );
   });
 
   test("--apply replays installed mcp when missing from settings", () => {
@@ -620,9 +734,9 @@ module.exports = function register(test) {
   test("--apply does not duplicate installed skill stub when already present", () => {
     const cwd = mkTempDir("kyos-apply-skill-noop-");
     runBootstrap({ cwd, apply: false });
-    addCapability({ cwd, type: "skill", name: "release-notes" });
+    addCapability({ cwd, type: "skill", name: "critic" });
 
-    const stubPath = path.join(cwd, ".claude", "skills", "release-notes", "SKILL.md");
+    const stubPath = path.join(cwd, ".claude", "skills", "critic", "SKILL.md");
     const contentBefore = fs.readFileSync(stubPath, "utf8");
 
     const result = runApply({ cwd });
@@ -630,23 +744,30 @@ module.exports = function register(test) {
 
     const contentAfter = fs.readFileSync(stubPath, "utf8");
     assert.equal(contentAfter, contentBefore, "existing stub must not be modified");
-    assert.ok(!result.lines.some((l) => String(l).includes("release-notes")), "no line for already-present stub");
+    assert.ok(!result.lines.some((l) => String(l).includes("critic")), "no line for already-present stub");
   });
 
-  test("--apply does not duplicate installed agent stub when already present", () => {
+  test("--apply leaves a locally authored agent alone and does not report it", () => {
     const cwd = mkTempDir("kyos-apply-agent-noop-");
     runBootstrap({ cwd, apply: false });
-    addCapability({ cwd, type: "agent", name: "triage" });
 
-    const stubPath = path.join(cwd, ".claude", "agents", "triage.md");
+    // /hire authors agents directly, so the file exists without a registry entry.
+    const configPath = path.join(cwd, "kyos.json");
+    const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    config.installed.agents = [...(config.installed.agents || []), "repo-specific-agent"];
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), "utf8");
+
+    const stubPath = path.join(cwd, ".claude", "agents", "repo-specific-agent.md");
+    fs.mkdirSync(path.dirname(stubPath), { recursive: true });
+    fs.writeFileSync(stubPath, "# Repo specific agent\n", "utf8");
     const contentBefore = fs.readFileSync(stubPath, "utf8");
 
     const result = runApply({ cwd });
     assert.equal(result.ok, true);
 
     const contentAfter = fs.readFileSync(stubPath, "utf8");
-    assert.equal(contentAfter, contentBefore, "existing agent stub must not be modified");
-    assert.ok(!result.lines.some((l) => String(l).includes("triage")), "no line for already-present agent");
+    assert.equal(contentAfter, contentBefore, "existing agent file must not be modified");
+    assert.ok(!result.lines.some((l) => String(l).includes("repo-specific-agent")), "no line for a file that is already present");
   });
 
   test("--apply does not duplicate installed mcp when already in settings", () => {
@@ -763,7 +884,7 @@ module.exports = function register(test) {
   test("loadUserConfig falls back to legacy .kyos/config.json when kyos.json is absent", () => {
     const cwd = mkTempDir("kyos-config-fallback-");
     runBootstrap({ cwd, apply: false });
-    addCapability({ cwd, type: "skill", name: "release-notes" });
+    addCapability({ cwd, type: "skill", name: "critic" });
 
     // Move the config to the legacy location without migrating.
     const newPath = path.join(cwd, "kyos.json");
@@ -784,12 +905,12 @@ module.exports = function register(test) {
     fs.writeFileSync(path.join(cwd, ".kyos", "config.json"), fs.readFileSync(newPath, "utf8"), "utf8");
     fs.rmSync(newPath);
 
-    addCapability({ cwd, type: "skill", name: "release-notes" });
+    addCapability({ cwd, type: "skill", name: "critic" });
 
     assert.ok(exists(cwd, "kyos.json"), "kyos.json must be created on the write");
     assert.ok(!exists(cwd, ".kyos/config.json"), "legacy config must be removed on the write");
     const config = JSON.parse(fs.readFileSync(newPath, "utf8"));
-    assert.ok((config.installed.skills || []).includes("release-notes"));
+    assert.ok((config.installed.skills || []).includes("critic"));
   });
 
   test("add hook repo-sandbox is idempotent (no duplicate settings or config entries)", () => {
