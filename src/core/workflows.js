@@ -34,6 +34,8 @@ const { sha256 } = require("./hash");
 const {
   applyManagedChanges,
   findStaleManagedFiles,
+  listCatalogMarkdown,
+  listCatalogSkills,
   loadLock,
   planManagedChanges,
   readVersionStamp,
@@ -41,31 +43,55 @@ const {
   writeVersionStamp,
 } = require("./managed-files");
 
-function readFrontmatterField(absolutePath, field) {
+function readCatalogSource(...pathSegmentsFromClaudeBase) {
+  const absolutePath = path.join(CATALOG_DIR, "claude-base", "claude", ...pathSegmentsFromClaudeBase);
   if (!fs.existsSync(absolutePath)) return null;
-  const content = fs.readFileSync(absolutePath, "utf8");
-  const match = content.match(new RegExp(`^${field}:\\s*(.+)$`, "m"));
+  return fs.readFileSync(absolutePath, "utf8").replace(/\r\n/g, "\n");
+}
+
+// Wrappers copy the definition's frontmatter verbatim, or carry none when the definition has
+// none. `model:`/`skills:` are functional configuration — inventing them in a wrapper silently
+// overrides how the agent runs, which is how every repo got a product-manager pinned to haiku.
+function readFrontmatterBlock(content) {
+  if (!content || !content.startsWith("---\n")) return null;
+  const close = content.indexOf("\n---\n", 3);
+  if (close === -1) return null;
+  return content.slice(0, close + 5);
+}
+
+// Title comes from the definition's own H1 so a wrapper can never misidentify what it wraps.
+function readFirstHeading(content) {
+  if (!content) return null;
+  const body = content.replace(/^---\n[\s\S]*?\n---\n/, "");
+  const match = body.match(/^#\s+(.+)$/m);
   return match ? match[1].trim() : null;
 }
 
-function walkSkillFiles(skillsRoot) {
-  if (!fs.existsSync(skillsRoot)) return [];
-  return fs.readdirSync(skillsRoot, { withFileTypes: true })
-    .filter((e) => e.isDirectory())
-    .flatMap((dir) => {
-      const skillFile = path.join(skillsRoot, dir.name, "SKILL.md");
-      return fs.existsSync(skillFile) ? [`${dir.name}/SKILL.md`] : [];
-    });
-}
-
 function loadManagedManifest() {
-  const base = path.join(CATALOG_DIR, "claude-base", "claude");
-  const commands = fs.readdirSync(path.join(base, "commands")).filter((f) => f.endsWith(".md"));
-  const skills = walkSkillFiles(path.join(base, "skills"));
-  // Only agents in registry baseline get .claude/ wrappers; other catalog agents are managed-only.
+  // Same catalog listing the managed layer renders from, so wrappers and definitions cannot
+  // drift apart. Agents are the exception: only those in registry baseline are seeded, the
+  // rest are managed-only — see assertSeededAgentsHaveDefinitions for the guard on that.
+  const commands = listCatalogMarkdown("commands");
+  const skills = listCatalogSkills();
   const catalog = loadCatalog();
   const agents = ((catalog.baseline || {}).agents || []).map((name) => `${name}.md`);
+  assertSeededAgentsHaveDefinitions(agents);
   return { commands, agents, skills };
+}
+
+// A seeded agent gets a .claude/ wrapper whose "Full definition" link points into the managed
+// layer. If the catalog has no definition for it, that link dangles in every repo that runs
+// --init. Fail loudly at bootstrap rather than shipping a broken wrapper.
+function assertSeededAgentsHaveDefinitions(agents) {
+  const available = new Set(listCatalogMarkdown("agents"));
+  const missing = agents.filter((filename) => !available.has(filename));
+  if (missing.length > 0) {
+    throw new Error(
+      `Seeded agents have no catalog definition: ${missing.join(", ")}. ` +
+      `Add them under catalog/claude-base/claude/agents/, or remove them from baseline.agents ` +
+      `in catalog/registry.json.`
+    );
+  }
 }
 
 function isPathWithinRoot(rootPath, candidatePath) {
@@ -166,13 +192,11 @@ Add any repo-specific guidance here.
 
 function managedAgentWrapper(filename) {
   const rel = `../../.kyos/claude/agents/${filename}`;
-  return `---
-model: haiku
-skills:
-  - silent-execution
----
+  const source = readCatalogSource("agents", filename);
+  const frontmatter = readFrontmatterBlock(source);
+  const title = readFirstHeading(source) || filename.replace(/\.md$/i, "");
 
-# Silent Executor (Managed)
+  return `${frontmatter ? `${frontmatter}\n` : ""}# ${title}
 
 This agent is managed by kyos-cli.
 
@@ -188,14 +212,13 @@ Add any repo-specific guidance here.
 `;
 }
 
-function managedSkillWrapper(relativePathFromSkillsRoot, { name, description }) {
+function managedSkillWrapper(relativePathFromSkillsRoot) {
   const rel = `../../../.kyos/claude/skills/${relativePathFromSkillsRoot}`;
-  return `---
-name: ${name}
-description: ${description}
----
+  const source = readCatalogSource("skills", ...relativePathFromSkillsRoot.split("/"));
+  const frontmatter = readFrontmatterBlock(source);
+  const title = readFirstHeading(source) || relativePathFromSkillsRoot.split("/")[0];
 
-# Silent Executor (Managed)
+  return `${frontmatter ? `${frontmatter}\n` : ""}# ${title}
 
 This skill is managed by kyos-cli.
 
@@ -332,9 +355,7 @@ function planLocalClaudeSeed({ cwd }) {
     [`${CLAUDE_ROOT}/commands/project-context.md`]:
       "# Project Context (Repo-Owned)\n\nCapture architecture, key commands, and testing guidance for this repository here.\n\n- What are we building?\n- What are the main components (UI/API/workers)?\n- What are the key external dependencies?\n- How do we run tests and validate changes?\n",
     [`${CLAUDE_ROOT}/agents/README.md`]:
-      "# Local Agents\n\nPut repo-specific agents here. This folder is intentionally yours; kyos will not overwrite local agents.\n\n## Available agents\n\n- `security-engineer.md` — deep-dive AppSec mindset for threat modeling, code review, and actionable remediations.\n",
-    [`${CLAUDE_ROOT}/agents/security-engineer.md`]:
-      "# Security Engineer (Deep Dive)\n\nYou are a pragmatic security engineer. You apply modern best practices, dig deeply into code and system behavior, and communicate clearly about risk and fixes.\n\n## Prevalidation gate (before doing work in a repo)\n\nWhen asked to work in an unfamiliar repo (or before running scripts/tests/tools), **prevalidate first**:\n\n1. Identify risky operations you might be asked to run (install scripts, formatters, “download then execute”, DB migrations).\n2. Scan for obvious red flags (committed secrets, unsafe shelling out, dangerous defaults).\n3. Confirm the safest “next command” to run (smallest, read-only, or dry-run).\n4. Only proceed to implementation after reporting the prevalidation results and any required guardrails.\n\nIf available, use `/kyos:prevalidate` and summarize its output before starting changes.\n\n## How you work\n\n- Prefer evidence over guesses: cite concrete code paths, configs, and behaviors.\n- Think in trust boundaries and data flows: sources → transforms → sinks.\n- Prioritize by impact × likelihood × ease-of-exploitation.\n- Recommend the smallest safe fix first; avoid breaking changes unless required.\n- Be explicit about assumptions and unknowns; ask targeted questions when needed.\n\n## Default workflow\n\n1. Scope & assets: what’s in scope, who are the actors, what data matters.\n2. Threat model: entry points, trust boundaries, high-priv capabilities.\n3. Attack surface review: inputs, authn/authz, session/token handling, data validation.\n4. Findings: impact, exploit scenario, evidence, severity.\n5. Remediation: preferred fix + safe alternatives; note migrations/gotchas.\n6. Verification: tests and manual steps to confirm the fix.\n\n## Common high-signal checks\n\n- Authz: IDOR/BOLA, missing role checks, privilege escalation.\n- Injection: SQL/NoSQL/command/template; unsafe deserialization.\n- Web: XSS, CSRF, open redirect, CORS misconfig.\n- SSRF: URL fetchers, webhooks, “download this URL”.\n- Secrets: hardcoded creds, secrets in logs/URLs, overly broad scopes.\n- DoS: unbounded payloads, expensive regex/queries, missing timeouts/rate limits.\n- Supply chain: “download then execute”, unpinned deps, unsafe CI.\n\n## Output format (use by default)\n\n- Summary: 3–6 bullets with the most important risks and next actions.\n- Findings (repeat per finding):\n  - Title\n  - Severity (Critical/High/Medium/Low/Info)\n  - Impact\n  - Exploit scenario / Preconditions\n  - Evidence (files/functions/configs; repro steps if safe)\n  - Fix (preferred + alternatives)\n  - Verification\n\n## Safety\n\nDo not provide instructions intended to facilitate real-world wrongdoing. Use minimal, controlled PoCs and harmless payloads when demonstrating issues.\n",
+      "# Local Agents\n\nPut repo-specific agents here. This folder is intentionally yours; kyos will not overwrite local agents.\n",
     [`${CLAUDE_ROOT}/skills/README.md`]:
       "# Local Skills\n\nPut repo-specific skills here. These are repo-owned instructions that complement the managed base under `.kyos/claude/`.\n",
     [`${CLAUDE_ROOT}/rules/README.md`]:
@@ -371,10 +392,6 @@ function planLocalClaudeSeed({ cwd }) {
   for (const filename of manifest.commands) {
     delete seedFiles[`${CLAUDE_ROOT}/commands/${filename}`];
   }
-  // security-engineer ships in .kyos/ as catalog content but is not seeded to .claude/
-  // (repo teams add it themselves if they want it; it's not a wrapper pattern).
-  delete seedFiles[`${CLAUDE_ROOT}/agents/security-engineer.md`];
-
   const results = [];
   for (const [relativePath, content] of Object.entries(seedFiles)) {
     const absolutePath = resolveRepoPath(cwd, relativePath);
@@ -412,13 +429,10 @@ function planLocalClaudeSeed({ cwd }) {
       results.push({ action: "ok", path: relativePath });
       continue;
     }
-    const skillName = relativePathFromSkillsRoot.split("/")[0];
-    const catalogSkillPath = path.join(CATALOG_DIR, "claude-base", "claude", "skills", relativePathFromSkillsRoot);
-    const description = readFrontmatterField(catalogSkillPath, "description") || `Managed skill: ${skillName}.`;
     results.push({
       action: "create",
       path: relativePath,
-      content: managedSkillWrapper(relativePathFromSkillsRoot, { name: skillName, description }),
+      content: managedSkillWrapper(relativePathFromSkillsRoot),
     });
   }
 
@@ -763,6 +777,19 @@ function addCapability({ cwd, type, name }) {
     };
   }
 
+  // --add installs what the package already ships. It has no repo context, so it cannot
+  // describe a capability it has never seen — inventing one is how no-op descriptions got
+  // into repos. Authoring something repo-specific is /hire's job.
+  if (!capability) {
+    return {
+      ok: false,
+      errors: [
+        `Unknown ${normalizedType} '${name}'. Add it to catalog/registry.json first, ` +
+        `or use /hire to author a repo-specific ${normalizedType}.`,
+      ],
+    };
+  }
+
   let targetRelativePath;
   if (normalizedType === "skill") {
     targetRelativePath = `${CLAUDE_ROOT}/skills/${name}/SKILL.md`;
@@ -817,14 +844,14 @@ function normalizeSkillFrontmatterName(identifier) {
 }
 
 function createOverrideTemplate({ type, name, capability }) {
-  const description = capability && capability.description
-    ? capability.description
-    : `Local ${type} customizations for ${name}.`;
+  // Callers resolve `capability` from the catalog before reaching here, so the description
+  // is always the real one. Never invent a description for a name the package does not ship.
+  const description = capability.description;
 
   if (type === "skill") {
     const frontmatterName = normalizeSkillFrontmatterName(name);
     const safeName = frontmatterName || "custom-skill";
-    return `---\nname: ${safeName}\ndescription: ${description}\n---\n\n# ${name}\n\n${description}\n\n## Purpose\n\nDescribe what this skill should help Claude do in this repo.\n\n## Instructions\n\n- Add the concrete behavior, constraints, and output contract here.\n- Keep it repo-specific and actionable.\n`;
+    return `---\nname: ${safeName}\ndescription: ${description}\n---\n\n# ${name}\n\n${description}\n\n## Purpose\n\nAdd repo-specific notes below to extend the catalog behavior.\n\n## Instructions\n\n- Keep additions repo-specific and actionable.\n`;
   }
 
   const title = `${type[0].toUpperCase()}${type.slice(1)} Override: ${name}`;
@@ -834,7 +861,7 @@ ${description}
 
 ## Purpose
 
-Describe what this repo needs to override or extend locally.
+Add repo-specific notes below to extend the catalog behavior.
 
 ## Contract
 
@@ -955,20 +982,24 @@ function replayInstalledCapabilities({ cwd, config }) {
   const catalog = loadCatalog();
   const lines = [];
 
-  for (const name of (config.installed.skills || [])) {
-    const targetPath = `${CLAUDE_ROOT}/skills/${name}/SKILL.md`;
-    if (!fs.existsSync(resolveRepoPath(cwd, targetPath))) {
-      const capability = getCapability(catalog, "skill", name);
-      writeRepoTextFile(cwd, targetPath, createOverrideTemplate({ type: "skill", name, capability }));
-      lines.push(`+ ${targetPath}`);
-    }
-  }
+  // A recorded capability with no catalog entry is an orphan: either it predates a registry
+  // change, or it was authored locally and later deleted. We cannot regenerate it faithfully,
+  // so report it rather than fabricating a stub with an invented description.
+  for (const [key, type, targetFor] of [
+    ["skills", "skill", (name) => `${CLAUDE_ROOT}/skills/${name}/SKILL.md`],
+    ["agents", "agent", (name) => `${CLAUDE_ROOT}/agents/${name}.md`],
+  ]) {
+    for (const name of (config.installed[key] || [])) {
+      const targetPath = targetFor(name);
+      if (fs.existsSync(resolveRepoPath(cwd, targetPath))) continue;
 
-  for (const name of (config.installed.agents || [])) {
-    const targetPath = `${CLAUDE_ROOT}/agents/${name}.md`;
-    if (!fs.existsSync(resolveRepoPath(cwd, targetPath))) {
-      const capability = getCapability(catalog, "agent", name);
-      writeRepoTextFile(cwd, targetPath, createOverrideTemplate({ type: "agent", name, capability }));
+      const capability = getCapability(catalog, type, name);
+      if (!capability) {
+        lines.push(`! ${targetPath} is missing and '${name}' is not in the catalog — restore the file or remove it from ${USER_CONFIG_FILE}`);
+        continue;
+      }
+
+      writeRepoTextFile(cwd, targetPath, createOverrideTemplate({ type, name, capability }));
       lines.push(`+ ${targetPath}`);
     }
   }
@@ -1079,6 +1110,9 @@ function runApply({ cwd }) {
 
 module.exports = {
   addCapability,
+  assertSeededAgentsHaveDefinitions,
+  managedAgentWrapper,
+  managedSkillWrapper,
   runApply,
   runBootstrap,
   runDoctor,

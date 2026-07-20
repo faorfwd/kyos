@@ -3,6 +3,45 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.3.2] - 2026-07-20
+
+Ships as a patch, but note the behavior changes below — `--add` now rejects names it
+previously accepted, and `--update` removes the two catalog agents from `.kyos/`.
+
+### Removed
+- `--add` no longer scaffolds an unknown skill or agent. An unrecognized name is rejected
+  with a pointer to `catalog/registry.json`, matching existing mcp/hook behavior. Authoring
+  repo-specific capabilities is `/kyos:hire`'s job.
+- Dropped the `product-manager` agent from the catalog and `baseline.agents`.
+- Dropped the `security-engineer` agent from the catalog. `/kyos:prevalidate` no longer
+  references it and now stands alone. Running `--update` removes
+  `.kyos/claude/agents/security-engineer.md` from existing repos.
+
+### Fixed
+- Seeded skill and agent wrappers were hardcoded to the title "Silent Executor (Managed)"
+  regardless of what they wrapped, so every repo received a `critic` skill titled
+  "Silent Executor". Titles now come from the wrapped definition's own H1.
+- Agent wrappers injected `model: haiku` and `skills: [silent-execution]` that no definition
+  declared, silently overriding how the agent ran. Frontmatter is now copied from the source
+  verbatim, or omitted when the source declares none.
+- `baseline.agents` seeded a `product-manager` wrapper whose "Full definition" link pointed
+  at a file `--init` never rendered.
+- The managed file set was hardcoded in `managed-files.js` and drifted from the catalog
+  silently; it is now derived from `catalog/claude-base/claude/`.
+- `--add` no longer invents descriptions such as `Local skill customizations for <name>.`
+
+### Added
+- Bootstrap fails loudly when `baseline.agents` names an agent with no catalog definition,
+  instead of shipping a wrapper whose definition link dangles.
+- `--doctor` / `--apply` report a recorded capability with no catalog entry as an orphan,
+  rather than regenerating it from an invented description.
+
+### Changed
+- `/kyos:hire` requires descriptions that name a trigger and a surface, bans name
+  restatements and vague scope, and authors repo-specific files directly.
+- Corrected the catalog listing in `CLAUDE.md`, which advertised five skills and an agent
+  the registry never defined.
+
 ## [1.3.1] - 2026-06-18
 ### Changed
 - docs(spec): prefer tracked issue key as spec slug when present

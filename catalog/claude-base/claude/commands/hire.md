@@ -33,7 +33,7 @@ Work in this order:
 3. Infer the actual stack from docs and repo signals.
 4. Look for the highest-value gaps, not every possible gap.
 5. Pull in catalog-backed additions where the match is obvious.
-6. Write local scaffolding where the repo needs something custom.
+6. Author the file yourself under `.claude/` where the repo needs something custom.
 
 ## Selection policy
 
@@ -41,6 +41,27 @@ Work in this order:
 - Skip anything that is technically relevant but not actually useful yet.
 - Prefer a small honest setup over a bloated pretend-complete setup.
 - If there is no good fit, say so plainly and leave a local note.
+
+## Description policy
+
+Every skill or agent you add must carry a description that says when Claude should reach for it in this repo. A stub is not finished until its description is real.
+
+Since you are writing these files yourself, there is no placeholder to fall back on.
+
+Do not ship:
+
+- a description that only restates the name back
+- vague scope — "helps with database stuff", "various backend utilities"
+
+Do ship a description that names the trigger and the surface:
+
+```text
+description: Conventions for Redis-backed job queues — key naming, TTL defaults, and retry semantics used by workers under src/jobs/.
+```
+
+Rule of thumb: if the description would still be true after swapping the repo for a different one, it is a no-op. Rewrite it or drop the stub.
+
+If you genuinely cannot describe the capability yet, do not create the stub — record the gap in the field report instead.
 
 ## Things this command should not do
 

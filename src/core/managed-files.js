@@ -27,21 +27,39 @@ function readCatalogText(relativePathFromCatalogDir) {
   return fs.readFileSync(absolutePath, "utf8");
 }
 
+function catalogBaseDir(subdir) {
+  return path.join(CATALOG_DIR, "claude-base", "claude", subdir);
+}
+
+// The managed set is derived from the catalog on disk, never hardcoded: a hardcoded list
+// drifts from the catalog silently, which is how a baseline agent once shipped a wrapper
+// pointing at a definition that was never rendered. Sorted for stable lock.json ordering.
+function listCatalogMarkdown(subdir) {
+  const dir = catalogBaseDir(subdir);
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+    .map((entry) => entry.name)
+    .sort();
+}
+
+function listCatalogSkills() {
+  const dir = catalogBaseDir("skills");
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => `${entry.name}/SKILL.md`)
+    .filter((relativePath) => fs.existsSync(path.join(dir, ...relativePath.split("/"))))
+    .sort();
+}
+
 function renderManagedFiles({ cwd, config }) {
   const repoName = path.basename(cwd);
-  const managedCommands = [
-    "README.md",
-    "prevalidate.md",
-    "architecture.md",
-    "hire.md",
-    "spec.md",
-    "tech.md",
-    "tasks.md",
-    "implement.md",
-    "verify.md",
-  ];
-  const managedAgents = ["README.md", "security-engineer.md"];
-  const managedSkills = ["silent-execution/SKILL.md", "critic/SKILL.md"];
+  // project-context.md is generated below rather than copied, so it is deliberately absent
+  // from the catalog commands directory and must not be added there.
+  const managedCommands = listCatalogMarkdown("commands");
+  const managedAgents = listCatalogMarkdown("agents");
+  const managedSkills = listCatalogSkills();
 
   const baseFiles = {
     [CLAUDE_MD_FILE]: `# ${repoName}
@@ -213,6 +231,8 @@ function findStaleManagedFiles(cwd, desiredFiles, currentLock) {
 module.exports = {
   applyManagedChanges,
   findStaleManagedFiles,
+  listCatalogMarkdown,
+  listCatalogSkills,
   loadLock,
   planManagedChanges,
   readVersionStamp,

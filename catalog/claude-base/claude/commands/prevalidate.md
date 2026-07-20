@@ -2,8 +2,6 @@
 
 Run a quick, **read-only** safety + security prevalidation before doing any work in a repo (especially before running installers, tests, or scripts).
 
-If available, run this using the Security Engineer agent (see `.kyos/claude/agents/security-engineer.md`).
-
 ## Goals
 
 - Reduce the chance of running something risky by accident.

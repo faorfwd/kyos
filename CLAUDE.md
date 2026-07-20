@@ -66,11 +66,17 @@ Supporting commands: `/prevalidate`, `/architecture`, `/hire`.
 
 ### Catalog (`catalog/registry.json`)
 
-Defines available capabilities that can be added with `--add`:
-- **Skills**: `release-notes`, `security-audit`, `path-safety`, `mcp-hardening`, `secrets-and-supply-chain`
-- **Agents**: `triage`
+Defines available capabilities that can be added with `--add`. `--add` installs only what
+the registry defines; an unknown name is rejected rather than scaffolded. Authoring a new
+repo-specific skill or agent is `/hire`'s job.
+
+- **Skills**: `critic`, `silent-execution`
+- **Agents**: none. The catalog ships no agent definitions and `baseline.agents` is empty, so `--init` seeds no agents. `.claude/agents/` is created as an empty repo-owned folder with a README.
 - **MCPs**: `context7`, `filesystem`
 - **Hooks**: `repo-sandbox` — `PreToolUse` guard blocking tool calls whose paths resolve outside the repo root. Script sources live in `catalog/hooks/<name>/`. The installer copies the chosen runtime's script to `.claude/hooks/` and wires the event into `.claude/settings.json`.
+
+Skills and agents are description-only registry entries: `--add` renders a stub from the
+registry `description`. Only hooks ship executable sources under `catalog/hooks/`.
 
 ## Working Rules
 
