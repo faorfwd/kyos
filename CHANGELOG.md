@@ -3,6 +3,10 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.3.3] - 2026-08-04
+### Changed
+- fix(bootstrap): drop unshipped process.md citation and use valid defaultMode
+
 ## [1.3.2] - 2026-07-20
 
 Ships as a patch, but note the behavior changes below — `--add` now rejects names it
