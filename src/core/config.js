@@ -124,7 +124,7 @@ function entryIsKyosOwned(entry) {
 }
 
 const BASE_AGENT_HOOK_PAYLOAD =
-  "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"PROCESS RULE: A subagent just completed. If the user now reports a bug or issue with its output, re-spawn the SAME agent type via the Agent tool — do NOT call Edit or Write inline. Only fix inline if it is a single-line typo or wiring mistake faster to correct than to brief an agent (per .claude/rules/process.md).\"}}' ";
+  "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"PROCESS RULE: A subagent just completed. If the user now reports a bug or issue with its output, re-spawn the SAME agent type via the Agent tool — do NOT call Edit or Write inline. Only fix inline if it is a single-line typo or wiring mistake faster to correct than to brief an agent.\"}}' ";
 
 const BASE_AGENT_MARKER = hookMarker("base-agent");
 const BASE_AGENT_HOOK = {

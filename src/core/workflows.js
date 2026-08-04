@@ -362,7 +362,7 @@ function planLocalClaudeSeed({ cwd }) {
       "# Local Rules\n\nPut repo-specific working rules here (coding standards, review expectations, release rules, security notes).\n",
     [`${CLAUDE_ROOT}/settings.json`]: stableStringify({
       permissions: {
-        defaultMode: "ask",
+        defaultMode: "default",
       },
     }),
     [`${CLAUDE_ROOT}/commands/README.md`]:

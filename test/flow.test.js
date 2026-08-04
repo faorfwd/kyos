@@ -135,7 +135,7 @@ module.exports = function register(test) {
     runApply({ cwd });
 
     const settings = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
-    assert.equal(settings.permissions.defaultMode, "ask", "original permissions must be preserved");
+    assert.equal(settings.permissions.defaultMode, "default", "original permissions must be preserved");
     const postToolUse = settings.hooks.PostToolUse;
     assert.ok(postToolUse.some((h) => h.matcher === "Bash"), "user's Bash hook must be preserved");
     assert.ok(postToolUse.some((h) => h.matcher === "Agent"), "Agent hook must be merged in");
@@ -1125,7 +1125,7 @@ module.exports = function register(test) {
     const cwd = mkTempDir("kyos-base-hook-legacy-");
     fs.mkdirSync(path.join(cwd, ".claude"), { recursive: true });
     const legacyCommand =
-      "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"PROCESS RULE: A subagent just completed. If the user now reports a bug or issue with its output, re-spawn the SAME agent type via the Agent tool — do NOT call Edit or Write inline. Only fix inline if it is a single-line typo or wiring mistake faster to correct than to brief an agent (per .claude/rules/process.md).\"}}' ";
+      "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"PROCESS RULE: A subagent just completed. If the user now reports a bug or issue with its output, re-spawn the SAME agent type via the Agent tool — do NOT call Edit or Write inline. Only fix inline if it is a single-line typo or wiring mistake faster to correct than to brief an agent.\"}}' ";
     const initial = {
       hooks: { PostToolUse: [{ matcher: "Agent", hooks: [{ type: "command", command: legacyCommand }] }] },
     };
@@ -1456,7 +1456,7 @@ module.exports = function register(test) {
   // ── Slice 5: ensureBaseHooks modes ───────────────────────────────────────────
 
   const LEGACY_BASE_COMMAND =
-    "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"PROCESS RULE: A subagent just completed. If the user now reports a bug or issue with its output, re-spawn the SAME agent type via the Agent tool — do NOT call Edit or Write inline. Only fix inline if it is a single-line typo or wiring mistake faster to correct than to brief an agent (per .claude/rules/process.md).\"}}' ";
+    "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"PROCESS RULE: A subagent just completed. If the user now reports a bug or issue with its output, re-spawn the SAME agent type via the Agent tool — do NOT call Edit or Write inline. Only fix inline if it is a single-line typo or wiring mistake faster to correct than to brief an agent.\"}}' ";
 
   function writeBaseSettings(cwd, postToolUse) {
     fs.mkdirSync(path.join(cwd, ".claude"), { recursive: true });
