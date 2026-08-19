@@ -1,0 +1,20 @@
+{
+  "plugins": [
+    {
+      "name": "kyos-skills",
+      "skills": [
+        "./catalog/claude-base/claude/skills/critic",
+        "./catalog/claude-base/claude/skills/silent-execution",
+        "./catalog/claude-base/claude/skills/spec",
+        "./catalog/claude-base/claude/skills/tech",
+        "./catalog/claude-base/claude/skills/tasks",
+        "./catalog/claude-base/claude/skills/implement",
+        "./catalog/claude-base/claude/skills/verify",
+        "./catalog/claude-base/claude/skills/prevalidate",
+        "./catalog/claude-base/claude/skills/architecture",
+        "./catalog/claude-base/claude/skills/hire",
+        "./catalog/claude-base/claude/skills/kyos-setup"
+      ]
+    }
+  ]
+}

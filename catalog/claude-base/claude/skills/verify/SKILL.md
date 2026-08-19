@@ -1,10 +1,15 @@
-# /verify
+---
+name: verify
+description: Check that implemented work matches the spec, still fits the plan, and leaves the repo in a trustworthy state.
+argument-hint: "[spec-slug or free-text description]"
+disable-model-invocation: true
+---
 
-> Check that implemented work matches the spec, still fits the plan, and leaves the repo in a trustworthy state.
+# Verify
 
-## When to use it
-
-Use this after one or more implementation slices have landed and you want a deliberate pass over correctness, behavior, and risk.
+Check that implemented work matches the spec, still fits the plan, and leaves the repo in a
+trustworthy state. Use this after one or more implementation slices have landed and you want a
+deliberate pass over correctness, behavior, and risk.
 
 ## What this should cover
 
@@ -20,12 +25,17 @@ Use this after one or more implementation slices have landed and you want a deli
 - `docs/execution/<spec-slug>/spec.md` — read automatically if it exists
 - `docs/execution/<spec-slug>/tech.md` — read automatically if it exists
 - `docs/execution/<spec-slug>/tasks.md` — read automatically if it exists
+- `.claude/skill-overrides/_shared.md` and `.claude/skill-overrides/verify.md`, if either exists in
+  this repo — read and apply them; the per-skill file wins on conflict with the shared one
 
-Derive the slug from the argument if provided; otherwise glob `docs/execution/*/` and use the most recently modified folder.
+Derive the slug from $ARGUMENTS if provided; otherwise glob `docs/execution/*/` and use the most
+recently modified folder.
+
+$ARGUMENTS
 
 ## Verification pass
 
-1. Locate the execution folder (from argument or most recently modified `docs/execution/*/`). Read `spec.md`, `tech.md`, and `tasks.md` from that folder — all that exist. Use them as the baseline to compare against the implementation.
+1. Locate the execution folder (from $ARGUMENTS or most recently modified `docs/execution/*/`). Read `spec.md`, `tech.md`, and `tasks.md` from that folder — all that exist. Use them as the baseline to compare against the implementation.
 2. Check whether the delivered behavior matches the promised behavior.
 3. Check whether the implementation drifted from the technical approach in a meaningful way.
 4. Run or inspect tests and validation steps where possible.
@@ -38,14 +48,6 @@ Derive the slug from the argument if provided; otherwise glob `docs/execution/*/
 - ignoring behavior drift just because the code looks reasonable
 - hiding gaps behind polite language
 
-## Example prompts
-
-```text
-/verify
-/verify check the OAuth implementation against the spec and tech plan
-/verify review the completed CSV import slices for regressions and missing tests
-```
-
 ## What Claude should return
 
 The result should make it easy to decide what happens next:
@@ -55,14 +57,17 @@ The result should make it easy to decide what happens next:
 - what needs to be fixed
 - whether the feature is ready to move forward
 
-## Next in flow
+## Next steps
 
-If verification fails, go back to [`/implement`](./implement.md).
+If verification fails, go back to the `implement` skill.
 
 If verification passes:
 
 - tell the user the feature spec is now completed
 - suggest deleting the finished spec note if it was only a temporary working artifact
 - keep it only if the team wants a durable product or decision record
-- then start the next feature cycle at [`/spec`](./spec.md)
+- then start the next feature cycle with the `spec` skill
 
+## Local additions
+
+Add repo-specific verification conventions here.

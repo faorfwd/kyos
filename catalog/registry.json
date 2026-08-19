@@ -16,6 +16,33 @@
     },
     "silent-execution": {
       "description": "Execution-first mode with minimal narration."
+    },
+    "spec": {
+      "description": "Capture a feature in user language before discussing tables, endpoints, or framework details."
+    },
+    "tech": {
+      "description": "Turn feature behavior into a build plan: moving parts, interfaces, data flow, failure modes, and implementation boundaries."
+    },
+    "tasks": {
+      "description": "Break the current technical plan into concrete, ordered work slices that can be executed and checked without losing the bigger picture."
+    },
+    "implement": {
+      "description": "Move the feature forward in small verified slices, using the available specialists and repo context without losing the plan."
+    },
+    "verify": {
+      "description": "Check that implemented work matches the spec, still fits the plan, and leaves the repo in a trustworthy state."
+    },
+    "prevalidate": {
+      "description": "Run a quick, read-only safety + security prevalidation before doing any work in a repo (especially before running installers, tests, or scripts)."
+    },
+    "architecture": {
+      "description": "Pin down the technical shape of the repo so later planning is built on decisions instead of vibes."
+    },
+    "hire": {
+      "description": "Stock the repo with the support it is missing before the next feature run trips over the same obvious gaps."
+    },
+    "kyos-setup": {
+      "description": "Scaffold and interactively configure kyos's skill-overrides mechanism — where spec/tech/tasks/implement/verify save artifacts, cleanup preferences, and per-skill tweaks."
     }
   },
   "agents": {},

@@ -14,7 +14,7 @@ const {
   managedAgentWrapper,
   managedSkillWrapper,
 } = require("../src/core/workflows");
-const { listCatalogMarkdown, listCatalogSkills } = require("../src/core/managed-files");
+const { listCatalogMarkdown, listCatalogSkills, listCatalogSkillSupportingFiles } = require("../src/core/managed-files");
 const {
   ensureBaseHooks,
   parseOwnedHookName,
@@ -46,44 +46,45 @@ module.exports = function register(test) {
     assert.ok(exists(cwd, ".kyos/claude/rules/README.md"));
     assert.ok(exists(cwd, "CLAUDE.md"));
 
-    assert.ok(exists(cwd, ".kyos/claude/commands/README.md"));
-    assert.ok(exists(cwd, ".kyos/claude/commands/spec.md"));
     assert.ok(exists(cwd, ".kyos/claude/agents/README.md"));
     assert.ok(exists(cwd, ".kyos/claude/skills/silent-execution/SKILL.md"));
+    assert.ok(exists(cwd, ".kyos/claude/skills/tech/SKILL.md"));
 
     assert.ok(exists(cwd, ".claude/commands/README.md"));
-    assert.ok(exists(cwd, ".claude/commands/spec.md"));
-    assert.ok(exists(cwd, ".claude/commands/architecture.md"));
+    assert.ok(!exists(cwd, ".claude/commands/spec.md"));
+    assert.ok(!exists(cwd, ".kyos/claude/commands"));
+    for (const name of ["spec", "tech", "tasks", "implement", "verify", "prevalidate", "architecture", "hire"]) {
+      assert.ok(!exists(cwd, `.kyos/claude/commands/${name}.md`));
+    }
 
-    const managedSpec = fs.readFileSync(path.join(cwd, ".kyos", "claude", "commands", "spec.md"), "utf8");
-    const localSpec = fs.readFileSync(path.join(cwd, ".claude", "commands", "spec.md"), "utf8");
-    assert.ok(localSpec.includes("../../.kyos/claude/commands/spec.md"));
-    assert.ok(localSpec.includes("/kyos:spec"));
-    assert.ok(localSpec.length < managedSpec.length);
+    assert.ok(exists(cwd, ".claude/skills/tech/SKILL.md"));
+    assert.ok(exists(cwd, ".claude/skills/tech/agents/openai.yaml"));
 
-    const managedArchitecture = fs.readFileSync(
-      path.join(cwd, ".kyos", "claude", "commands", "architecture.md"),
+    const managedTech = fs.readFileSync(path.join(cwd, ".kyos", "claude", "skills", "tech", "SKILL.md"), "utf8");
+    const localTech = fs.readFileSync(path.join(cwd, ".claude", "skills", "tech", "SKILL.md"), "utf8");
+    assert.ok(localTech.includes("../../../.kyos/claude/skills/tech/SKILL.md"));
+    assert.ok(managedTech.includes("disable-model-invocation: true"));
+    assert.ok(localTech.includes("disable-model-invocation: true"));
+    assert.ok(localTech.length < managedTech.length);
+
+    const managedSidecar = fs.readFileSync(
+      path.join(cwd, ".kyos", "claude", "skills", "tech", "agents", "openai.yaml"),
       "utf8"
     );
-    const localArchitecture = fs.readFileSync(path.join(cwd, ".claude", "commands", "architecture.md"), "utf8");
-    assert.ok(localArchitecture.includes("../../.kyos/claude/commands/architecture.md"));
-    assert.ok(localArchitecture.includes("/kyos:architecture"));
-    assert.ok(localArchitecture.length < managedArchitecture.length);
+    const localSidecar = fs.readFileSync(path.join(cwd, ".claude", "skills", "tech", "agents", "openai.yaml"), "utf8");
+    assert.equal(localSidecar, managedSidecar);
 
-    const managedReadme = fs.readFileSync(path.join(cwd, ".kyos", "claude", "commands", "README.md"), "utf8");
-    const localReadme = fs.readFileSync(path.join(cwd, ".claude", "commands", "README.md"), "utf8");
-    assert.ok(localReadme.includes("../../.kyos/claude/commands/README.md"));
-    assert.ok(localReadme.length < managedReadme.length);
-
-    const catalogSpec = fs.readFileSync(
-      path.join(__dirname, "..", "catalog", "claude-base", "claude", "commands", "spec.md"),
+    const catalogTech = fs.readFileSync(
+      path.join(__dirname, "..", "catalog", "claude-base", "claude", "skills", "tech", "SKILL.md"),
       "utf8"
     );
-    assert.equal(managedSpec, catalogSpec);
+    assert.equal(managedTech, catalogTech);
     assert.ok(exists(cwd, ".claude/agents/README.md"));
     assert.ok(exists(cwd, ".claude/rules/README.md"));
     assert.ok(exists(cwd, ".claude/skills/README.md"));
     assert.ok(exists(cwd, ".claude/skills/silent-execution/SKILL.md"));
+    assert.ok(exists(cwd, ".claude/skill-overrides/README.md"));
+    assert.ok(exists(cwd, ".claude/skill-overrides/_shared.md"));
 
     const gitignore = fs.readFileSync(path.join(cwd, ".gitignore"), "utf8");
     assert.ok(gitignore.includes("node_modules/"));
@@ -233,7 +234,7 @@ module.exports = function register(test) {
     const cwd = mkTempDir("kyos-flow-");
     runBootstrap({ cwd, apply: false });
 
-    fs.rmSync(path.join(cwd, ".kyos", "claude", "commands", "spec.md"));
+    fs.rmSync(path.join(cwd, ".kyos", "claude", "skills", "tech", "SKILL.md"));
 
     const result = runBootstrap({ cwd, apply: false });
     assert.equal(result.ok, true);
@@ -246,22 +247,20 @@ module.exports = function register(test) {
 
     const doctor = runDoctor({ cwd });
     assert.equal(doctor.ok, true);
-    assert.ok(doctor.lines.some((line) => String(line).includes("command: architecture.md local wrapper ok")));
-    assert.ok(doctor.lines.some((line) => String(line).includes("command: architecture.md") && String(line).includes("managed ok")));
   });
 
-  test("doctor reports when a .claude command wrapper changes", () => {
+  test("doctor reports when a managed file's checksum drifts", () => {
     const cwd = mkTempDir("kyos-flow-");
     runBootstrap({ cwd, apply: false });
 
-    const architecturePath = path.join(cwd, ".claude", "commands", "architecture.md");
-    const original = fs.readFileSync(architecturePath, "utf8");
-    fs.writeFileSync(architecturePath, `${original}\ncustom note\n`, "utf8");
+    const managedTechPath = path.join(cwd, ".kyos", "claude", "skills", "tech", "SKILL.md");
+    const original = fs.readFileSync(managedTechPath, "utf8");
+    fs.writeFileSync(managedTechPath, `${original}\ncustom note\n`, "utf8");
 
     const doctor = runDoctor({ cwd });
     assert.equal(doctor.ok, true);
     assert.ok(
-      doctor.lines.some((line) => String(line).includes("command: architecture.md") && String(line).includes("local changed"))
+      doctor.warnings.some((w) => String(w).includes(".kyos/claude/skills/tech/SKILL.md") && String(w).includes("differs"))
     );
   });
 
@@ -270,7 +269,8 @@ module.exports = function register(test) {
     runBootstrap({ cwd, apply: false });
 
     fs.writeFileSync(path.join(cwd, "CLAUDE.md"), "# custom\n", "utf8");
-    fs.writeFileSync(path.join(cwd, ".claude", "commands", "spec.md"), "# custom spec\n", "utf8");
+    fs.mkdirSync(path.join(cwd, ".claude", "skills", "tech"), { recursive: true });
+    fs.writeFileSync(path.join(cwd, ".claude", "skills", "tech", "SKILL.md"), "# custom tech\n", "utf8");
     fs.mkdirSync(path.join(cwd, ".claude", "commands", "extra"), { recursive: true });
     fs.writeFileSync(path.join(cwd, ".claude", "commands", "extra", "note.md"), "hello", "utf8");
 
@@ -283,35 +283,34 @@ module.exports = function register(test) {
 
     assert.equal(exists(cwd, ".claude/commands/extra/note.md"), false);
 
-    const localSpec = fs.readFileSync(path.join(cwd, ".claude", "commands", "spec.md"), "utf8");
-    assert.ok(localSpec.includes("../../.kyos/claude/commands/spec.md"));
-    assert.ok(localSpec.includes("/kyos:spec"));
+    const localTech = fs.readFileSync(path.join(cwd, ".claude", "skills", "tech", "SKILL.md"), "utf8");
+    assert.ok(localTech.includes("../../../.kyos/claude/skills/tech/SKILL.md"));
 
-    assert.ok(exists(cwd, ".kyos/claude/commands/spec.md"));
+    assert.ok(exists(cwd, ".kyos/claude/skills/tech/SKILL.md"));
   });
 
   test("--update rewrites only .kyos", () => {
     const cwd = mkTempDir("kyos-update-");
     runBootstrap({ cwd, apply: false });
 
-    const localSpecPath = path.join(cwd, ".claude", "commands", "spec.md");
-    fs.writeFileSync(localSpecPath, "# custom spec\n", "utf8");
+    const localTechPath = path.join(cwd, ".claude", "skills", "tech", "SKILL.md");
+    fs.writeFileSync(localTechPath, "# custom tech\n", "utf8");
 
-    const managedSpecPath = path.join(cwd, ".kyos", "claude", "commands", "spec.md");
-    fs.writeFileSync(managedSpecPath, "# tampered managed spec\n", "utf8");
+    const managedTechPath = path.join(cwd, ".kyos", "claude", "skills", "tech", "SKILL.md");
+    fs.writeFileSync(managedTechPath, "# tampered managed tech\n", "utf8");
 
     const result = runUpdateKyos({ cwd });
     assert.equal(result.ok, true);
 
     // .claude should be untouched
-    assert.equal(fs.readFileSync(localSpecPath, "utf8"), "# custom spec\n");
+    assert.equal(fs.readFileSync(localTechPath, "utf8"), "# custom tech\n");
 
     // .kyos should be regenerated to catalog baseline
-    const catalogSpec = fs.readFileSync(
-      path.join(__dirname, "..", "catalog", "claude-base", "claude", "commands", "spec.md"),
+    const catalogTech = fs.readFileSync(
+      path.join(__dirname, "..", "catalog", "claude-base", "claude", "skills", "tech", "SKILL.md"),
       "utf8"
     );
-    assert.equal(fs.readFileSync(managedSpecPath, "utf8"), catalogSpec);
+    assert.equal(fs.readFileSync(managedTechPath, "utf8"), catalogTech);
 
     // kyos.json lives at the repo root, outside .kyos, so --update never touches it
     assert.ok(exists(cwd, "kyos.json"), "kyos.json should not be deleted by --update");
@@ -334,17 +333,17 @@ module.exports = function register(test) {
     assert.deepEqual(configAfter, configBefore, "config.json must be identical after --update");
   });
 
-  test(".claude command wrappers are not overwritten if customized", () => {
+  test(".claude skill wrappers are not overwritten if customized", () => {
     const cwd = mkTempDir("kyos-flow-");
     runBootstrap({ cwd, apply: false });
 
-    const localSpecPath = path.join(cwd, ".claude", "commands", "spec.md");
-    fs.writeFileSync(localSpecPath, "# custom spec\n", "utf8");
+    const localTechPath = path.join(cwd, ".claude", "skills", "tech", "SKILL.md");
+    fs.writeFileSync(localTechPath, "# custom tech\n", "utf8");
 
     runBootstrap({ cwd, apply: true });
 
-    const after = fs.readFileSync(localSpecPath, "utf8");
-    assert.equal(after, "# custom spec\n");
+    const after = fs.readFileSync(localTechPath, "utf8");
+    assert.equal(after, "# custom tech\n");
   });
 
   test("capability name validation blocks traversal-style input", () => {
@@ -387,21 +386,21 @@ module.exports = function register(test) {
     const cwd = mkTempDir("kyos-apply-missing-");
     runBootstrap({ cwd, apply: false });
 
-    const specPath = path.join(cwd, ".kyos", "claude", "commands", "spec.md");
-    const originalSpec = fs.readFileSync(specPath, "utf8");
-    fs.rmSync(specPath);
+    const techPath = path.join(cwd, ".kyos", "claude", "skills", "tech", "SKILL.md");
+    const originalTech = fs.readFileSync(techPath, "utf8");
+    fs.rmSync(techPath);
 
-    const localSpecPath = path.join(cwd, ".claude", "commands", "spec.md");
-    fs.writeFileSync(localSpecPath, "# custom spec\n", "utf8");
+    const localTechPath = path.join(cwd, ".claude", "skills", "tech", "SKILL.md");
+    fs.writeFileSync(localTechPath, "# custom tech\n", "utf8");
 
     const result = runApply({ cwd });
     assert.equal(result.ok, true);
     assert.ok(result.summary.includes("1 created"));
 
-    assert.ok(exists(cwd, ".kyos/claude/commands/spec.md"));
-    assert.equal(fs.readFileSync(specPath, "utf8"), originalSpec);
+    assert.ok(exists(cwd, ".kyos/claude/skills/tech/SKILL.md"));
+    assert.equal(fs.readFileSync(techPath, "utf8"), originalTech);
 
-    assert.equal(fs.readFileSync(localSpecPath, "utf8"), "# custom spec\n");
+    assert.equal(fs.readFileSync(localTechPath, "utf8"), "# custom tech\n");
   });
 
   test("--apply skips files that already exist on disk", () => {
@@ -421,26 +420,26 @@ module.exports = function register(test) {
     const cwd = mkTempDir("kyos-apply-lock-");
     runBootstrap({ cwd, apply: false });
 
-    const specPath = path.join(cwd, ".kyos", "claude", "commands", "spec.md");
-    fs.rmSync(specPath);
+    const techPath = path.join(cwd, ".kyos", "claude", "skills", "tech", "SKILL.md");
+    fs.rmSync(techPath);
 
     const lockBefore = JSON.parse(fs.readFileSync(path.join(cwd, ".kyos", "lock.json"), "utf8"));
-    const specKey = ".kyos/claude/commands/spec.md";
-    delete lockBefore.files[specKey];
+    const techKey = ".kyos/claude/skills/tech/SKILL.md";
+    delete lockBefore.files[techKey];
     fs.writeFileSync(path.join(cwd, ".kyos", "lock.json"), JSON.stringify(lockBefore), "utf8");
 
     runApply({ cwd });
 
     const lockAfter = JSON.parse(fs.readFileSync(path.join(cwd, ".kyos", "lock.json"), "utf8"));
-    assert.ok(lockAfter.files[specKey], "lock should have an entry for the created file");
-    assert.ok(lockAfter.files[specKey].checksum, "lock entry should have a checksum");
+    assert.ok(lockAfter.files[techKey], "lock should have an entry for the created file");
+    assert.ok(lockAfter.files[techKey].checksum, "lock entry should have a checksum");
   });
 
   test("analysis warning mentions --apply when safe creates exist", () => {
     const cwd = mkTempDir("kyos-apply-warning-");
     runBootstrap({ cwd, apply: false });
 
-    fs.rmSync(path.join(cwd, ".kyos", "claude", "commands", "spec.md"));
+    fs.rmSync(path.join(cwd, ".kyos", "claude", "skills", "tech", "SKILL.md"));
 
     const result = runBootstrap({ cwd, apply: false });
     assert.equal(result.ok, true);
@@ -471,13 +470,13 @@ module.exports = function register(test) {
     const cwd = mkTempDir("kyos-conflict-");
     runBootstrap({ cwd, apply: false });
 
-    const managedSpecPath = path.join(cwd, ".kyos", "claude", "commands", "spec.md");
-    fs.writeFileSync(managedSpecPath, "# custom edit\n", "utf8");
+    const managedTechPath = path.join(cwd, ".kyos", "claude", "skills", "tech", "SKILL.md");
+    fs.writeFileSync(managedTechPath, "# custom edit\n", "utf8");
 
     const result = runBootstrap({ cwd, apply: false });
     assert.equal(result.ok, true);
     assert.ok(result.summary.includes("1 managed conflicts"), `expected conflict in summary: ${result.summary}`);
-    assert.ok(result.lines.some((line) => String(line).includes("spec.md") && String(line).includes("local changes")));
+    assert.ok(result.lines.some((line) => String(line).includes("tech/SKILL.md") && String(line).includes("local changes")));
   });
 
   test("blocked detected when an unmanaged file occupies a managed path", () => {
@@ -486,17 +485,17 @@ module.exports = function register(test) {
 
     const lockPath = path.join(cwd, ".kyos", "lock.json");
     const lock = JSON.parse(fs.readFileSync(lockPath, "utf8"));
-    const managedKey = ".kyos/claude/commands/spec.md";
+    const managedKey = ".kyos/claude/skills/tech/SKILL.md";
     delete lock.files[managedKey];
     fs.writeFileSync(lockPath, JSON.stringify(lock), "utf8");
 
-    const specPath = path.join(cwd, ".kyos", "claude", "commands", "spec.md");
-    fs.writeFileSync(specPath, "# unmanaged content\n", "utf8");
+    const techPath = path.join(cwd, ".kyos", "claude", "skills", "tech", "SKILL.md");
+    fs.writeFileSync(techPath, "# unmanaged content\n", "utf8");
 
     const result = runBootstrap({ cwd, apply: false });
     assert.equal(result.ok, true);
     assert.ok(result.summary.includes("1 unmanaged blockers"), `expected blocker in summary: ${result.summary}`);
-    assert.ok(result.lines.some((line) => String(line).includes("spec.md")));
+    assert.ok(result.lines.some((line) => String(line).includes("tech/SKILL.md")));
   });
 
   test("add rejects a skill or agent the package does not ship", () => {
@@ -582,19 +581,14 @@ module.exports = function register(test) {
     for (const filename of listCatalogMarkdown("agents")) {
       assert.ok(exists(cwd, `.kyos/claude/agents/${filename}`), `agent ${filename} must render`);
     }
-    for (const filename of listCatalogMarkdown("commands")) {
-      assert.ok(exists(cwd, `.kyos/claude/commands/${filename}`), `command ${filename} must render`);
-    }
     for (const relativePath of listCatalogSkills()) {
       assert.ok(exists(cwd, `.kyos/claude/skills/${relativePath}`), `skill ${relativePath} must render`);
     }
 
-    // project-context.md is generated, not copied, so it must stay out of the catalog dir.
-    assert.ok(
-      !listCatalogMarkdown("commands").includes("project-context.md"),
-      "project-context.md is generated and must not be added to the catalog commands dir"
-    );
-    assert.ok(exists(cwd, ".kyos/claude/commands/project-context.md"), "generated command still renders");
+    // Project context now lives in the repo-owned skill-overrides file, not a managed/generated
+    // commands/project-context.md — that concept survives both kyos-cli and skills.sh installs.
+    assert.equal(listCatalogMarkdown("commands").length, 0, "there is no commands catalog collection anymore");
+    assert.ok(exists(cwd, ".claude/skill-overrides/_shared.md"), "shared override file still seeds");
   });
 
   test("--init seeds no agent wrappers while baseline.agents is empty", () => {
@@ -610,6 +604,37 @@ module.exports = function register(test) {
     // The catalog ships no agent definitions, so nothing renders into the managed layer either.
     const managed = listCatalogMarkdown("agents").filter((f) => f !== "README.md");
     assert.deepEqual(managed, [], `no catalog agent definitions expected, got ${JSON.stringify(managed)}`);
+  });
+
+  test("listCatalogSkillSupportingFiles finds the fixture file, excludes SKILL.md", () => {
+    const supporting = listCatalogSkillSupportingFiles("silent-execution");
+    assert.ok(
+      supporting.includes(path.posix.join("reference", "example.md")),
+      `expected fixture supporting file, got: ${JSON.stringify(supporting)}`
+    );
+    assert.ok(!supporting.includes("SKILL.md"), "SKILL.md must not be treated as a supporting file");
+
+    assert.deepEqual(listCatalogSkillSupportingFiles("does-not-exist"), []);
+  });
+
+  test("a skill's supporting files render into both the managed and local layers on bootstrap", () => {
+    const cwd = mkTempDir("kyos-skill-supporting-files-");
+    runBootstrap({ cwd, apply: false });
+
+    const managedPath = ".kyos/claude/skills/silent-execution/reference/example.md";
+    const localPath = ".claude/skills/silent-execution/reference/example.md";
+    assert.ok(exists(cwd, managedPath), `expected managed supporting file at ${managedPath}`);
+    assert.ok(exists(cwd, localPath), `expected local supporting file at ${localPath}`);
+
+    const catalogContent = fs.readFileSync(
+      path.join(__dirname, "..", "catalog", "claude-base", "claude", "skills", "silent-execution", "reference", "example.md"),
+      "utf8"
+    );
+    assert.equal(fs.readFileSync(path.join(cwd, ...managedPath.split("/")), "utf8"), catalogContent);
+    assert.equal(fs.readFileSync(path.join(cwd, ...localPath.split("/")), "utf8"), catalogContent);
+
+    const lock = JSON.parse(fs.readFileSync(path.join(cwd, ".kyos", "lock.json"), "utf8"));
+    assert.ok(lock.files[managedPath], "supporting file must be checksum-tracked in the lock file");
   });
 
   test("add mcp writes to .claude/settings.json and records in config", () => {
@@ -1569,15 +1594,165 @@ module.exports = function register(test) {
     const cwd = mkTempDir("kyos-update-still-resets-");
     runBootstrap({ cwd, apply: false });
 
-    const managedSpecPath = path.join(cwd, ".kyos", "claude", "commands", "spec.md");
-    fs.writeFileSync(managedSpecPath, "# tampered\n", "utf8");
+    const managedTechPath = path.join(cwd, ".kyos", "claude", "skills", "tech", "SKILL.md");
+    fs.writeFileSync(managedTechPath, "# tampered\n", "utf8");
 
     runUpdateKyos({ cwd });
 
-    const catalogSpec = fs.readFileSync(
-      path.join(__dirname, "..", "catalog", "claude-base", "claude", "commands", "spec.md"),
+    const catalogTech = fs.readFileSync(
+      path.join(__dirname, "..", "catalog", "claude-base", "claude", "skills", "tech", "SKILL.md"),
       "utf8"
     );
-    assert.equal(fs.readFileSync(managedSpecPath, "utf8"), catalogSpec, ".kyos must be reset to baseline");
+    assert.equal(fs.readFileSync(managedTechPath, "utf8"), catalogTech, ".kyos must be reset to baseline");
+  });
+
+  test("stale detection reports a pre-migration commands/tech.md-shaped lock entry", () => {
+    const cwd = mkTempDir("kyos-stale-commands-");
+    runBootstrap({ cwd, apply: false });
+
+    const lockPath = path.join(cwd, ".kyos", "lock.json");
+    const lock = JSON.parse(fs.readFileSync(lockPath, "utf8"));
+    lock.files[".kyos/claude/commands/tech.md"] = { checksum: "deadbeef", managed: true };
+    fs.writeFileSync(lockPath, JSON.stringify(lock), "utf8");
+
+    const result = runBootstrap({ cwd, apply: false });
+    assert.equal(result.ok, true);
+    assert.ok(result.warnings.some((w) => String(w).toLowerCase().includes("stale")));
+    assert.ok(
+      result.lines.some(
+        (line) => String(line).includes(".kyos/claude/commands/tech.md") && String(line).includes("no longer part")
+      )
+    );
+  });
+
+  test("doctor is silent on a foreign SKILL.md dropped under .claude/skills/", () => {
+    const cwd = mkTempDir("kyos-foreign-skill-");
+    runBootstrap({ cwd, apply: false });
+
+    const foreignDir = path.join(cwd, ".claude", "skills", "some-third-party-skill");
+    fs.mkdirSync(foreignDir, { recursive: true });
+    fs.writeFileSync(path.join(foreignDir, "SKILL.md"), "---\nname: some-third-party-skill\n---\n\n# Foreign\n", "utf8");
+
+    const doctor = runDoctor({ cwd });
+    assert.equal(doctor.ok, true);
+    assert.ok(!doctor.warnings.some((w) => String(w).includes("some-third-party-skill")));
+    assert.ok(!doctor.errors.some((e) => String(e).includes("some-third-party-skill")));
+
+    const lock = JSON.parse(fs.readFileSync(path.join(cwd, ".kyos", "lock.json"), "utf8"));
+    assert.ok(
+      !Object.keys(lock.files).some((key) => key.includes("some-third-party-skill")),
+      "foreign skill must not be lock-tracked"
+    );
+  });
+
+  test("marketplace.json declares exactly the skills in the registry, each resolving to a real SKILL.md", () => {
+    const marketplace = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "..", ".claude-plugin", "marketplace.json"), "utf8")
+    );
+    const registry = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "..", "catalog", "registry.json"), "utf8")
+    );
+
+    const manifestNames = marketplace.plugins
+      .flatMap((plugin) => plugin.skills)
+      .map((skillPath) => skillPath.split("/").pop())
+      .sort();
+    const registryNames = Object.keys(registry.skills).sort();
+
+    assert.deepEqual(manifestNames, registryNames);
+
+    for (const plugin of marketplace.plugins) {
+      for (const skillPath of plugin.skills) {
+        const skillMdPath = path.join(__dirname, "..", skillPath.replace(/^\.\//, ""), "SKILL.md");
+        assert.ok(fs.existsSync(skillMdPath), `${skillPath} must resolve to a real SKILL.md`);
+      }
+    }
+  });
+
+  test("kyos-setup ships disable-model-invocation, sidecar, registry entry, and manifest inclusion", () => {
+    assert.ok(exists(path.join(__dirname, ".."), "catalog/claude-base/claude/skills/kyos-setup/SKILL.md"));
+    const skillContent = fs.readFileSync(
+      path.join(__dirname, "..", "catalog", "claude-base", "claude", "skills", "kyos-setup", "SKILL.md"),
+      "utf8"
+    );
+    assert.ok(skillContent.includes("disable-model-invocation: true"));
+    assert.ok(
+      exists(path.join(__dirname, ".."), "catalog/claude-base/claude/skills/kyos-setup/agents/openai.yaml")
+    );
+
+    const registry = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "..", "catalog", "registry.json"), "utf8")
+    );
+    assert.ok(registry.skills["kyos-setup"]);
+
+    const marketplace = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "..", ".claude-plugin", "marketplace.json"), "utf8")
+    );
+    const manifestNames = marketplace.plugins.flatMap((plugin) => plugin.skills).map((p) => p.split("/").pop());
+    assert.ok(manifestNames.includes("kyos-setup"));
+  });
+
+  test("override-check line present in the eight flow/reference skills, absent from critic/silent-execution", () => {
+    const flowSkills = ["spec", "tech", "tasks", "implement", "verify", "prevalidate", "architecture", "hire"];
+    for (const name of flowSkills) {
+      const content = fs.readFileSync(
+        path.join(__dirname, "..", "catalog", "claude-base", "claude", "skills", name, "SKILL.md"),
+        "utf8"
+      );
+      assert.ok(content.includes(".claude/skill-overrides/_shared.md"), `${name} must mention _shared.md`);
+      assert.ok(content.includes(`.claude/skill-overrides/${name}.md`), `${name} must mention its own override file`);
+    }
+
+    for (const name of ["critic", "silent-execution"]) {
+      const content = fs.readFileSync(
+        path.join(__dirname, "..", "catalog", "claude-base", "claude", "skills", name, "SKILL.md"),
+        "utf8"
+      );
+      assert.ok(!content.includes("skill-overrides"), `${name} must not mention skill-overrides`);
+    }
+  });
+
+  test("fresh bootstrap has no flow/reference command files, only skill twins", () => {
+    const cwd = mkTempDir("kyos-no-commands-");
+    runBootstrap({ cwd, apply: false });
+
+    for (const name of ["spec", "tech", "tasks", "implement", "verify", "prevalidate", "architecture", "hire"]) {
+      assert.equal(exists(cwd, `.kyos/claude/commands/${name}.md`), false);
+      assert.equal(exists(cwd, `.claude/commands/${name}.md`), false);
+      assert.ok(exists(cwd, `.claude/skills/${name}/SKILL.md`));
+    }
+  });
+
+  test("--add skill end-to-end for a converted flow skill (tech)", () => {
+    const cwd = mkTempDir("kyos-add-tech-");
+    runBootstrap({ cwd, apply: false });
+    fs.rmSync(path.join(cwd, ".claude", "skills", "tech"), { recursive: true, force: true });
+
+    const result = addCapability({ cwd, type: "skill", name: "tech" });
+    assert.equal(result.ok, true);
+    assert.ok(exists(cwd, ".claude/skills/tech/SKILL.md"));
+  });
+
+  test("project context lives in skill-overrides/_shared.md, not a commands/ file, in either install schema", () => {
+    const cwd = mkTempDir("kyos-project-context-");
+    runBootstrap({ cwd, apply: false });
+
+    // kyos-cli schema: seeded automatically, one level above every skill's own directory.
+    assert.ok(!exists(cwd, ".claude/commands/project-context.md"));
+    assert.ok(!exists(cwd, ".kyos/claude/commands/project-context.md"));
+    const shared = fs.readFileSync(path.join(cwd, ".claude", "skill-overrides", "_shared.md"), "utf8");
+    assert.ok(shared.includes("Project context"));
+    assert.ok(shared.includes("main components"));
+
+    // skills.sh schema: no project-context.md path is referenced by any shipped skill body, so
+    // nothing dangles when a repo has no kyos-cli involvement at all.
+    for (const name of ["spec", "tech", "architecture", "hire"]) {
+      const skillContent = fs.readFileSync(
+        path.join(__dirname, "..", "catalog", "claude-base", "claude", "skills", name, "SKILL.md"),
+        "utf8"
+      );
+      assert.ok(!skillContent.includes(".claude/commands/project-context.md"), `${name} must not reference the retired path`);
+      assert.ok(skillContent.includes(".claude/skill-overrides/_shared.md"), `${name} must reference _shared.md instead`);
+    }
   });
 };

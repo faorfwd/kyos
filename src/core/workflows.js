@@ -36,8 +36,10 @@ const {
   findStaleManagedFiles,
   listCatalogMarkdown,
   listCatalogSkills,
+  listCatalogSkillSupportingFiles,
   loadLock,
   planManagedChanges,
+  readCatalogText,
   readVersionStamp,
   renderManagedFiles,
   writeVersionStamp,
@@ -71,12 +73,11 @@ function loadManagedManifest() {
   // Same catalog listing the managed layer renders from, so wrappers and definitions cannot
   // drift apart. Agents are the exception: only those in registry baseline are seeded, the
   // rest are managed-only — see assertSeededAgentsHaveDefinitions for the guard on that.
-  const commands = listCatalogMarkdown("commands");
   const skills = listCatalogSkills();
   const catalog = loadCatalog();
   const agents = ((catalog.baseline || {}).agents || []).map((name) => `${name}.md`);
   assertSeededAgentsHaveDefinitions(agents);
-  return { commands, agents, skills };
+  return { agents, skills };
 }
 
 // A seeded agent gets a .claude/ wrapper whose "Full definition" link points into the managed
@@ -165,29 +166,6 @@ function forceResetKyosOnly({ cwd }) {
 
     fs.rmSync(absolutePath, { recursive: true, force: true });
   }
-}
-
-function managedCommandWrapper(filename) {
-  const slug = filename.replace(/\.md$/i, "");
-  const isReadme = slug.toLowerCase() === "readme";
-  const title = isReadme ? "Kyos Commands" : `/kyos:${slug}`;
-  const rel = `../../.kyos/claude/commands/${filename}`;
-
-  return `# ${title}
-
-This command is managed by kyos-cli.
-
-You can:
-
-- Add repo-specific notes/rules below to enrich the managed version, or
-- Replace this file entirely and (optionally) remove the "Full definition" link to rely only on yours.
-
-- Full definition: [${rel}](${rel})
-
-## Local additions
-
-Add any repo-specific guidance here.
-`;
 }
 
 function managedAgentWrapper(filename) {
@@ -352,8 +330,6 @@ function runBootstrap({ cwd, apply, force }) {
 
 function planLocalClaudeSeed({ cwd }) {
   const seedFiles = {
-    [`${CLAUDE_ROOT}/commands/project-context.md`]:
-      "# Project Context (Repo-Owned)\n\nCapture architecture, key commands, and testing guidance for this repository here.\n\n- What are we building?\n- What are the main components (UI/API/workers)?\n- What are the key external dependencies?\n- How do we run tests and validate changes?\n",
     [`${CLAUDE_ROOT}/agents/README.md`]:
       "# Local Agents\n\nPut repo-specific agents here. This folder is intentionally yours; kyos will not overwrite local agents.\n",
     [`${CLAUDE_ROOT}/skills/README.md`]:
@@ -366,32 +342,38 @@ function planLocalClaudeSeed({ cwd }) {
       },
     }),
     [`${CLAUDE_ROOT}/commands/README.md`]:
-      "# Local Commands\n\nThis folder is for repo-owned workflow prompts (slash-style commands).\n\nRecommended daily flow:\n\n`/kyos:spec -> /kyos:tech -> /kyos:tasks -> /kyos:implement -> /kyos:verify`\n\nIf you’re new to the repo or about to run tooling/scripts, start with:\n\n`/kyos:prevalidate`\n",
-    [`${CLAUDE_ROOT}/commands/prevalidate.md`]:
-      "# /kyos:prevalidate\n\nRun a quick, **read-only** safety + security prevalidation before doing any work in a repo (especially before running installers, tests, or scripts).\n\n## Goals\n\n- Reduce the chance of running something risky by accident.\n- Surface obvious security hygiene issues early (secrets, unsafe execution patterns).\n- Establish the *safest* next command to run.\n\n## What to do (default)\n\n1. **Repo orientation**\n   - Identify language/tooling (Node/Python/.NET/PowerShell/SQL/etc.) and where “entry points” live.\n   - Identify where config and automation lives (`.github/workflows`, install scripts, task runners).\n2. **Secrets & sensitive data scan**\n   - Search for credential patterns, private keys, tokens, and `.env*` variants.\n   - Confirm `.gitignore` covers local secret files and common backups.\n3. **Execution boundary scan**\n   - Look for “download then execute”, dynamic code execution, and shell injection primitives.\n   - PowerShell red flags: `Invoke-Expression`, `ExecutionPolicy Bypass`, machine-wide `Set-ExecutionPolicy`.\n   - SQL red flags: `xp_cmdshell`, OLE automation, broad grants, hardcoded SQL logins/passwords.\n4. **Supply-chain sanity**\n   - Check whether dependencies are pinned/locked (`package-lock.json`, `pnpm-lock.yaml`, `poetry.lock`, constraints files).\n   - Note any scripts that fetch remote content and execute it.\n5. **Safe next step**\n   - Recommend the smallest safe next action (prefer read-only commands like `git status`, `rg`, listing files, or a dry-run).\n\n## Output format\n\n- **Green/Yellow/Red** overall status\n- **Top risks**: 3–6 bullets with file references\n- **Guardrails**: what not to run or what to run with extra caution\n- **Next safe command**: one command suggestion (read-only/dry-run preferred)\n",
-    [`${CLAUDE_ROOT}/commands/architecture.md`]:
-      "# /kyos:architecture\n\nUse when the repo needs a directional refresh: clarify the target architecture, boundaries, and the few decisions that should not be revisited every task.\n",
-    [`${CLAUDE_ROOT}/commands/hire.md`]:
-      "# /kyos:hire\n\nUse when the current stack needs better support: missing skills, agents, or MCPs. Prefer small, explicit additions that reduce friction for the next few tasks.\n",
-    [`${CLAUDE_ROOT}/commands/spec.md`]:
-      "# /kyos:spec\n\nWrite a concrete, user-facing spec: goals, non-goals, acceptance criteria, and edge cases.\n\nNext: [/kyos:tech](./tech.md)\n",
-    [`${CLAUDE_ROOT}/commands/tech.md`]:
-      "# /kyos:tech\n\nTurn the spec into an engineering plan: approach, data/contracts, risk list, and test strategy.\n\nNext: [/kyos:tasks](./tasks.md)\n",
-    [`${CLAUDE_ROOT}/commands/tasks.md`]:
-      "# /kyos:tasks\n\nBreak the plan into ordered slices that can be implemented and verified safely.\n\nNext: [/kyos:implement](./implement.md)\n",
-    [`${CLAUDE_ROOT}/commands/implement.md`]:
-      "# /kyos:implement\n\nImplement one slice at a time. Keep changes reviewable and run the smallest relevant verification each slice.\n\nNext: [/kyos:verify](./verify.md)\n",
-    [`${CLAUDE_ROOT}/commands/verify.md`]:
-      "# /kyos:verify\n\nVerify behavior against the spec and plan. If it passes, suggest deleting any completed working spec files that are no longer useful.\n\nNext cycle: [/kyos:spec](./spec.md)\n",
+      "# Local Commands\n\nThis folder is for repo-owned workflow prompts (slash-style commands). The built-in " +
+      "`spec -> tech -> tasks -> implement -> verify` flow ships as skills instead (see `.claude/skills/`), " +
+      "invoked by their bare name (e.g. `/spec`).\n\nIf you’re new to the repo or about to run tooling/scripts, start with the `prevalidate` skill.\n\n" +
+      "To install a third-party skill via `npx skills add`, pass `--copy` so the install lands as a real file " +
+      "kyos-cli won't collide with, rather than a symlink.\n",
+    [`${CLAUDE_ROOT}/skill-overrides/README.md`]:
+      "# Skill overrides\n\nFiles in this folder customize kyos skills without editing the skills themselves, so your\n" +
+      "changes survive both `kyos-cli --update` and `npx skills update`.\n\n" +
+      "- `_shared.md` — preferences and project context several skills read (repo architecture, where\n" +
+      "  spec/tech/tasks/implement/verify save their artifacts, etc). Also the one file guaranteed to\n" +
+      "  exist regardless of whether this repo was set up via kyos-cli or a bare `npx skills add`\n" +
+      "  install, so it's the right place for anything every skill should be able to read.\n" +
+      "- `<skill-name>.md` — tweaks for one skill only. Wins over `_shared.md` on conflict.\n\n" +
+      "Run the `kyos-setup` skill to be walked through the common ones, or hand-edit these files directly.\n",
+    [`${CLAUDE_ROOT}/skill-overrides/_shared.md`]:
+      "# Shared skill preferences\n\n" +
+      "Preferences and project context several kyos skills read. Fill in what applies; leave the rest.\n\n" +
+      "## Project context\n\n" +
+      "Capture architecture, key components, and testing guidance for this repository here.\n\n" +
+      "- What are we building?\n" +
+      "- What are the main components (UI/API/workers)?\n" +
+      "- What are the key external dependencies?\n" +
+      "- How do we run tests and validate changes?\n\n" +
+      "<!--\n" +
+      "## Execution artifact location\n\nDefault: `docs/execution/<slug>/`\n\n" +
+      "## Cleanup after verify\n\nDelete the completed execution folder after `verify` passes, or keep it as a durable record?\n\n" +
+      "## Slug convention\n\ne.g. always prefer a tracked issue key.\n" +
+      "-->\n",
   };
 
   const manifest = loadManagedManifest();
 
-  // Seed the managed commands as short wrappers that point to `.kyos/claude/commands/`,
-  // while leaving `.claude/commands/project-context.md` as repo-owned content.
-  for (const filename of manifest.commands) {
-    delete seedFiles[`${CLAUDE_ROOT}/commands/${filename}`];
-  }
   const results = [];
   for (const [relativePath, content] of Object.entries(seedFiles)) {
     const absolutePath = resolveRepoPath(cwd, relativePath);
@@ -400,16 +382,6 @@ function planLocalClaudeSeed({ cwd }) {
       continue;
     }
     results.push({ action: "create", path: relativePath, content });
-  }
-
-  for (const filename of manifest.commands) {
-    const relativePath = `${CLAUDE_ROOT}/commands/${filename}`;
-    const absolutePath = resolveRepoPath(cwd, relativePath);
-    if (fs.existsSync(absolutePath)) {
-      results.push({ action: "ok", path: relativePath });
-      continue;
-    }
-    results.push({ action: "create", path: relativePath, content: managedCommandWrapper(filename) });
   }
 
   for (const filename of manifest.agents) {
@@ -434,6 +406,23 @@ function planLocalClaudeSeed({ cwd }) {
       path: relativePath,
       content: managedSkillWrapper(relativePathFromSkillsRoot),
     });
+  }
+
+  for (const relativePathFromSkillsRoot of manifest.skills) {
+    const skillName = relativePathFromSkillsRoot.split("/")[0];
+    for (const supportingPath of listCatalogSkillSupportingFiles(skillName)) {
+      const relativePath = `${CLAUDE_ROOT}/skills/${skillName}/${supportingPath}`;
+      const absolutePath = resolveRepoPath(cwd, relativePath);
+      if (fs.existsSync(absolutePath)) {
+        results.push({ action: "ok", path: relativePath });
+        continue;
+      }
+      results.push({
+        action: "create",
+        path: relativePath,
+        content: readCatalogText(`claude-base/claude/skills/${skillName}/${supportingPath}`),
+      });
+    }
   }
 
   return { results };
@@ -554,51 +543,6 @@ function runDoctor({ cwd, fix = false }) {
     warnings.push(`${stale.length} stale managed files were found.`);
   }
 
-  const { commands: managedCommands } = loadManagedManifest();
-  const commandReport = [];
-  for (const filename of managedCommands) {
-    const catalogPath = path.join(CATALOG_DIR, "claude-base", "claude", "commands", filename);
-    const catalogContent = fs.readFileSync(catalogPath, "utf8");
-    const catalogBytes = Buffer.byteLength(catalogContent, "utf8");
-    const catalogChecksum = sha256(catalogContent);
-
-    const managedRelativePath = `${MANAGED_ROOT}/commands/${filename}`;
-    const managedAbsolutePath = resolveRepoPath(cwd, managedRelativePath);
-    let managedNote = "missing";
-    if (fs.existsSync(managedAbsolutePath)) {
-      const managedContent = fs.readFileSync(managedAbsolutePath, "utf8");
-      const managedBytes = Buffer.byteLength(managedContent, "utf8");
-      const managedChecksum = sha256(managedContent);
-      managedNote =
-        managedChecksum === catalogChecksum
-          ? `ok (${managedBytes}B)`
-          : `differs from catalog (${managedBytes}B vs ${catalogBytes}B)`;
-    }
-
-    const localRelativePath = `${CLAUDE_ROOT}/commands/${filename}`;
-    const localAbsolutePath = resolveRepoPath(cwd, localRelativePath);
-    const wrapperContent = managedCommandWrapper(filename);
-    const wrapperBytes = Buffer.byteLength(wrapperContent, "utf8");
-    const wrapperChecksum = sha256(wrapperContent);
-
-    let localNote = "missing";
-    if (fs.existsSync(localAbsolutePath)) {
-      const localContent = fs.readFileSync(localAbsolutePath, "utf8");
-      const localBytes = Buffer.byteLength(localContent, "utf8");
-      const localChecksum = sha256(localContent);
-
-      if (localChecksum === wrapperChecksum) {
-        localNote = `wrapper ok (${localBytes}B)`;
-      } else if (localChecksum === catalogChecksum) {
-        localNote = `matches catalog (${localBytes}B)`;
-      } else {
-        localNote = `changed (${localBytes}B; catalog ${catalogBytes}B; wrapper ${wrapperBytes}B)`;
-      }
-    }
-
-    commandReport.push(`command: ${filename} local ${localNote}; managed ${managedNote}`);
-  }
-
   // Hook wiring audit (read-only): duplicates, version drift, unmarked shadows.
   const settings = readJsonIfExists(resolveRepoPath(cwd, MCP_CONFIG_FILE)) || {};
   const managedHooks = buildManagedHooks(config);
@@ -652,7 +596,6 @@ function runDoctor({ cwd, fix = false }) {
       `installed agents: ${(config.installed.agents || []).length}`,
       `installed mcps: ${(config.installed.mcps || []).length}`,
       `installed hooks: ${(config.installed.hooks || []).length}`,
-      ...commandReport,
       ...hookFixLines,
     ],
     warnings,

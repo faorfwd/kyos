@@ -86,6 +86,13 @@ kyos-cli --add hook repo-sandbox     # Blocks Claude's attempts to access paths 
 
 MCP entries are wired up automatically.
 
+`/spec`, `/tech`, `/tasks`, `/implement`, `/verify`, `/prevalidate`, `/architecture`, and `/hire`
+ship as explicit-only skills (not a separate commands catalog), so the whole set is also published
+via `.claude-plugin/marketplace.json` and installable in any other agent harness with
+[`npx skills add`](https://github.com/vercel-labs/skills) — pass `--copy` so the install lands as a
+real file, not a symlink. Run the `kyos-setup` skill afterwards to configure per-repo overrides
+(e.g. where execution artifacts get saved) without hand-editing the installed skills.
+
 ## Multi-repo rollout
 
 The CLI runs in whatever directory you're in, so you can roll it out across projects with a simple loop:

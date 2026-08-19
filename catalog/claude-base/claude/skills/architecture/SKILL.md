@@ -1,12 +1,23 @@
-# /architecture
+---
+name: architecture
+description: Pin down the technical shape of the repo so later planning is built on decisions instead of vibes.
+disable-model-invocation: true
+---
 
-> Pin down the technical shape of the repo so later planning is built on decisions instead of vibes.
+# Architecture
+
+Pin down the technical shape of the repo so later planning is built on decisions instead of
+vibes.
+
+Before proceeding, check for `.claude/skill-overrides/_shared.md` and
+`.claude/skill-overrides/architecture.md` in this repo. If either exists, read it and apply it —
+on conflict, the per-skill file wins.
 
 ## Core question
 
 What are we actually building on, and where are the boundaries?
 
-This command is for answering that question in repo terms:
+This skill is for answering that question in repo terms:
 
 - application layers
 - storage choices
@@ -31,14 +42,15 @@ The output should be a usable architecture note, not a generic manifesto.
 
 It should leave behind:
 
-- clearer repo-level technical decisions in `.claude/commands/project-context.md`
+- clearer repo-level technical decisions recorded in `.claude/skill-overrides/_shared.md` (create
+  it from the standard template if missing — see the `kyos-setup` skill)
 - explicit choices where the repo needs them
 - known tradeoffs and risks written down in plain language
 - a short note on whether current specialists and tooling are enough
 
 ## Questions to settle
 
-Claude should push toward concrete answers in areas like:
+Push toward concrete answers in areas like:
 
 - where UI, API, workers, and background processes live
 - how data is stored and how state moves through the system
@@ -61,14 +73,6 @@ Claude should push toward concrete answers in areas like:
 - for each question, include your recommended answer (plus a brief rationale) and wait for confirmation
 - if a question can be answered by inspecting the repo, explore the codebase/config first instead of asking
 
-## Example prompts
-
-```text
-/architecture
-/architecture choose a backend and deployment model for a small SaaS
-/architecture split this repo into app, worker, and shared data responsibilities
-```
-
 ## What a good response looks like
 
 A good result should leave a reader able to answer:
@@ -78,7 +82,7 @@ A good result should leave a reader able to answer:
 - where the risky edges are
 - what support is missing around that stack
 
-If new stack areas appear that the repo is not equipped for, point to `/hire`.
+If new stack areas appear that the repo is not equipped for, point to the `hire` skill.
 
 ## Where to save the result (so it can be committed)
 
@@ -93,3 +97,7 @@ Optional additions (if helpful):
 - `docs/architecture/overview.md` for a longer-lived narrative architecture overview
 - `docs/architecture/diagrams/` for diagrams and supporting assets
 - `docs/adr/` for small, dated decision records (ADRs)
+
+## Local additions
+
+Add repo-specific architecture conventions here.

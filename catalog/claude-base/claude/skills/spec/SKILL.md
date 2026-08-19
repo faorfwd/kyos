@@ -1,10 +1,12 @@
-# /spec
+---
+name: spec
+description: Capture a feature in user language before discussing tables, endpoints, or framework details.
+disable-model-invocation: true
+---
 
-> Capture a feature in user language before discussing tables, endpoints, or framework details.
+# Spec
 
-## Purpose
-
-Use this command to turn an idea into a focused behavior spec with clear success conditions.
+Capture a feature in user language before discussing tables, endpoints, or framework details.
 
 Typical outcomes:
 
@@ -19,9 +21,12 @@ This is a working artifact, not permanent repo documentation. Once the feature i
 
 - current project priorities
 - `CLAUDE.md`
-- `.claude/commands/project-context.md`
 - any nearby product or design notes
 - user persona or role (inferred from context; only prompted if none is discernible)
+- `.claude/skill-overrides/_shared.md` and `.claude/skill-overrides/spec.md`, if either exists in
+  this repo — read and apply them (project/repo context, such as architecture, main components,
+  and external dependencies, lives in `_shared.md` too); the per-skill file wins on conflict with
+  the shared one
 
 ## Workflow
 
@@ -39,17 +44,7 @@ This is a working artifact, not permanent repo documentation. Once the feature i
 - Keep the scope narrow.
 - Prefer clarity over placeholder fluff.
 
-## Example prompts
-
-```text
-/spec
-/spec add GitHub OAuth sign-in
-/spec let users upload CSV files and preview validation errors before import
-```
-
 ## Claude behavior
-
-When using this command, Claude should:
 
 1. Restate the feature in plain language.
 2. Ask for any missing user-facing detail.
@@ -58,13 +53,9 @@ When using this command, Claude should:
 5. Save the result into a local planning note.
 6. After saving, check whether `tech.md` or `tasks.md` already exist in the same execution folder. If either exists, append a **Related** section to spec.md with links to the existing sibling artefacts.
 
-## Next in flow
+## Next steps
 
-**Model tip:** Use `/model sonnet` for straightforward issues, `/model opus` for large or architecturally complex ones. Revert when the planning phase is done.
-
-If the context meter is at 50% or more, run `/compact` before continuing — the spec is saved to disk so nothing is lost.
-
-Continue with [`/tech`](./tech.md) to turn the feature behavior into an engineering approach.
+Once the spec is saved to disk, continue with the `tech` skill to turn the feature behavior into an engineering approach.
 
 ## Related section format
 
@@ -92,4 +83,8 @@ Create a dedicated execution folder for this spec, then write the spec into a re
 3. Write the spec to:
    - `docs/execution/<spec-slug>/spec.md`
 
-If the spec is purely a temporary working artifact, it can be deleted after `/verify`—but default to committing it while work is in flight.
+If the spec is purely a temporary working artifact, it can be deleted after `verify`—but default to committing it while work is in flight.
+
+## Local additions
+
+Add repo-specific spec conventions here.
