@@ -23,10 +23,6 @@ This is a working artifact, not permanent repo documentation. Once the feature i
 - `CLAUDE.md`
 - any nearby product or design notes
 - user persona or role (inferred from context; only prompted if none is discernible)
-- `.claude/skill-overrides/_shared.md` and `.claude/skill-overrides/spec.md`, if either exists in
-  this repo — read and apply them (project/repo context, such as architecture, main components,
-  and external dependencies, lives in `_shared.md` too); the per-skill file wins on conflict with
-  the shared one
 
 ## Workflow
 
@@ -87,4 +83,6 @@ If the spec is purely a temporary working artifact, it can be deleted after `ver
 
 ## Local additions
 
-Add repo-specific spec conventions here.
+- Generic extensions are located at `.claude/skill-overrides/_shared.md`. 
+- Skill specific extensions are located at `.claude/skill-overrides/implement.md`. These have priority when competing with more generic instructions.
+
