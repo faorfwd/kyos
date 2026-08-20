@@ -78,7 +78,7 @@ If you genuinely cannot describe the capability yet, do not create the stub — 
 - hide missing support behind generic placeholders
 - treat the first setup pass as final
 
-## What Claude should return
+## What Agent should return
 
 The result should read like a field report:
 
