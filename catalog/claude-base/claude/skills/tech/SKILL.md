@@ -1,6 +1,6 @@
 ---
 name: tech
-description: Turn feature behavior into a build plan: moving parts, interfaces, data flow, failure modes, and implementation boundaries.
+description: Turn feature behavior into a build plan - moving parts, interfaces, data flow, failure modes, and implementation boundaries.
 argument-hint: "[spec-slug or free-text description]"
 disable-model-invocation: true
 ---
