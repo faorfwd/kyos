@@ -84,7 +84,5 @@ Once the implementation slice is ready to be checked, continue with the `verify`
 
 ## Local additions
 
-## Local additions
-
 - Generic extensions are located at `.claude/skill-overrides/_shared.md`. 
 - Skill specific extensions are located at `.claude/skill-overrides/implement.md`. These have priority when competing with more generic instructions.
