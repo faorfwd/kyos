@@ -56,22 +56,19 @@ Changes to managed files are planned (create/update/conflict/blocked) before bei
 
 ### Managed Workflow Skills
 
-The `spec → tech → tasks → implement → verify` flow, plus the supporting `prevalidate`,
-`architecture`, and `hire` skills, ship as ordinary catalog skills under
-`catalog/claude-base/claude/skills/<name>/` (managed copies) and `.claude/skills/<name>/` (repo
-wrappers) — not as a separate `commands` collection. Each carries `disable-model-invocation: true`
-so it behaves like a legacy slash command (typed explicitly via `/<name>`, never auto-invoked) plus
-an `agents/openai.yaml` sidecar so Codex respects the same explicit-only behavior. `.claude/commands/`
-still exists as a repo-owned folder for anything a repo wants to add itself, but no longer holds the
-built-in flow.
+Located in `catalog/claude-base/claude/skills/<name>/` (managed copies) and `.claude/skills/<name>/` (repo wrappers). Recommended delivery chain:
 
-An eleventh skill, `kyos-setup`, scaffolds and interactively populates `.claude/skill-overrides/` —
-a location outside every skill's own directory (so it survives both `kyos-cli --update` and
-`npx skills update`) where a repo can override a skill's defaults (e.g. where `spec`/`tech`/`tasks`/
-`implement`/`verify` save execution artifacts) without hand-editing the skill itself. All eleven
-skills are also published for other harnesses via `.claude-plugin/marketplace.json` at the repo
-root, installable elsewhere with `npx skills add` (pass `--copy` so the install lands as a real file,
-not a symlink).
+```
+/spec → /tech → /tasks → /implement → /verify
+```
+
+Supporting skills: `/prevalidate`, `/architecture`, `/hire`. Each carries `disable-model-invocation: true`, so it behaves like a legacy slash command (typed explicitly via `/<name>`, never auto-invoked), plus an `agents/openai.yaml` sidecar so Codex respects the same explicit-only behavior. `.claude/commands/` remains a repo-owned folder for anything a repo wants to add itself, but does not hold the built-in flow.
+
+An eleventh skill, `kyos-setup`, scaffolds and interactively populates the skill override layer (below). All eleven skills are also published for other harnesses via `.claude-plugin/marketplace.json` at the repo root, installable elsewhere with `npx skills add` (pass `--copy` so the install lands as a real file, not a symlink).
+
+### Skill Override Layer
+
+`.claude/skill-overrides/` holds per-repo overrides of skill defaults (e.g. where `spec`/`tech`/`tasks`/`implement`/`verify` save execution artifacts), keyed by skill name (`<name>.md`) plus a shared file (`_shared.md`) for cross-skill defaults. It lives outside every skill's own directory, so overrides survive both `kyos-cli --update` and `npx skills update`.
 
 ### Catalog (`catalog/registry.json`)
 
