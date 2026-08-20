@@ -69,7 +69,7 @@ If the task file exposes multiple ready slices that can be done independently, p
 - Keep one "orchestrator" thread responsible for integration, conflict resolution, and updating the task file.
 - Avoid parallelizing work that shares the same files, schema, or core design decisions (do those sequentially).
 
-## Claude behavior
+## Agent behavior
 
 1. Locate the execution folder (from $ARGUMENTS or most recently modified `docs/execution/*/`). Read `spec.md`, `tech.md`, and `tasks.md` from that folder — all that exist. Treat `tasks.md` as the source of truth for progress and remaining work.
 2. Select the next concrete slice (or small set of independent slices).
