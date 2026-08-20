@@ -24,8 +24,6 @@ Typical outcomes:
 - `docs/execution/<spec-slug>/spec.md` — read automatically if it exists
 - `docs/execution/<spec-slug>/tech.md` — read automatically if it exists
 - `docs/execution/<spec-slug>/tasks.md` — read automatically if it exists (treated as the execution task file)
-- `.claude/skill-overrides/_shared.md` and `.claude/skill-overrides/implement.md`, if either exists
-  in this repo — read and apply them; the per-skill file wins on conflict with the shared one
 
 Derive the slug from $ARGUMENTS if provided; otherwise glob `docs/execution/*/` and use the most
 recently modified folder.
@@ -86,4 +84,7 @@ Once the implementation slice is ready to be checked, continue with the `verify`
 
 ## Local additions
 
-Add repo-specific implementation conventions here.
+## Local additions
+
+- Generic extensions are located at `.claude/skill-overrides/_shared.md`. 
+- Skill specific extensions are located at `.claude/skill-overrides/implement.md`. These have priority when competing with more generic instructions.
