@@ -9,10 +9,6 @@ disable-model-invocation: true
 Run a quick, **read-only** safety + security prevalidation before doing any work in a repo
 (especially before running installers, tests, or scripts).
 
-Before proceeding, check for `.claude/skill-overrides/_shared.md` and
-`.claude/skill-overrides/prevalidate.md` in this repo. If either exists, read it and apply it — on
-conflict, the per-skill file wins.
-
 ## Goals
 
 - Reduce the chance of running something risky by accident.
@@ -46,4 +42,6 @@ conflict, the per-skill file wins.
 
 ## Local additions
 
-Add repo-specific prevalidation checks here.
+- Generic extensions are located at `.claude/skill-overrides/_shared.md`. 
+- Skill specific extensions are located at `.claude/skill-overrides/implement.md`. These have priority when competing with more generic instructions.
+
