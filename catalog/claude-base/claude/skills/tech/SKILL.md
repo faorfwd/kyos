@@ -22,10 +22,6 @@ Typical outcomes:
 - the existing codebase
 - `docs/execution/<spec-slug>/spec.md` — read automatically if it exists (derive the slug from
   $ARGUMENTS, or scan `docs/execution/` and use the most recently modified folder)
-- `.claude/skill-overrides/_shared.md` and `.claude/skill-overrides/tech.md`, if either exists in
-  this repo — read and apply them (project/repo context, such as architecture, main components,
-  and external dependencies, lives in `_shared.md` too); the per-skill file wins on conflict with
-  the shared one
 
 ## Workflow
 
@@ -44,7 +40,7 @@ Typical outcomes:
 
 $ARGUMENTS
 
-## Claude behavior
+## Agen behavior
 
 1. Locate the execution folder: derive the slug from $ARGUMENTS if given, otherwise glob
    `docs/execution/*/` and pick the most recently modified folder. Read `spec.md` from that
@@ -72,4 +68,6 @@ Write into `docs/execution/<spec-slug>/tech.md`, using the same slug chosen by t
 
 ## Local additions
 
-Add repo-specific technical conventions here.
+- Generic extensions are located at `.claude/skill-overrides/_shared.md`. 
+- Skill specific extensions are located at `.claude/skill-overrides/implement.md`. These have priority when competing with more generic instructions.
+
