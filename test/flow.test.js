@@ -606,11 +606,11 @@ module.exports = function register(test) {
     assert.deepEqual(managed, [], `no catalog agent definitions expected, got ${JSON.stringify(managed)}`);
   });
 
-  test("listCatalogSkillSupportingFiles finds the fixture file, excludes SKILL.md", () => {
-    const supporting = listCatalogSkillSupportingFiles("silent-execution");
+  test("listCatalogSkillSupportingFiles finds a real sidecar, excludes SKILL.md", () => {
+    const supporting = listCatalogSkillSupportingFiles("kyos-setup");
     assert.ok(
-      supporting.includes(path.posix.join("reference", "example.md")),
-      `expected fixture supporting file, got: ${JSON.stringify(supporting)}`
+      supporting.includes(path.posix.join("agents", "openai.yaml")),
+      `expected agents/openai.yaml supporting file, got: ${JSON.stringify(supporting)}`
     );
     assert.ok(!supporting.includes("SKILL.md"), "SKILL.md must not be treated as a supporting file");
 
@@ -621,13 +621,13 @@ module.exports = function register(test) {
     const cwd = mkTempDir("kyos-skill-supporting-files-");
     runBootstrap({ cwd, apply: false });
 
-    const managedPath = ".kyos/claude/skills/silent-execution/reference/example.md";
-    const localPath = ".claude/skills/silent-execution/reference/example.md";
+    const managedPath = ".kyos/claude/skills/kyos-setup/agents/openai.yaml";
+    const localPath = ".claude/skills/kyos-setup/agents/openai.yaml";
     assert.ok(exists(cwd, managedPath), `expected managed supporting file at ${managedPath}`);
     assert.ok(exists(cwd, localPath), `expected local supporting file at ${localPath}`);
 
     const catalogContent = fs.readFileSync(
-      path.join(__dirname, "..", "catalog", "claude-base", "claude", "skills", "silent-execution", "reference", "example.md"),
+      path.join(__dirname, "..", "catalog", "claude-base", "claude", "skills", "kyos-setup", "agents", "openai.yaml"),
       "utf8"
     );
     assert.equal(fs.readFileSync(path.join(cwd, ...managedPath.split("/")), "utf8"), catalogContent);
