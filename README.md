@@ -15,9 +15,21 @@ Claude Code works best with structure — without it, conversations drift, conte
 npx kyos-cli --init
 ```
 
-- Sets up a base Claude Code structure in your project — commands, workflow steps, and a config.
+- Sets up a base Claude Code structure in your project — skills, workflow steps, and a config.
 - Safe to run on an existing project: it shows you what it would change before doing anything.
 - Run `kyos-cli --apply` to add only what's missing, or `kyos-cli --init --force` to start fresh.
+
+<details>
+  <summary><strong>Codex, Copilot and other harnesses</strong></summary>
+
+  1. Use skills.sh installer:
+  ```bash
+  npx skills@latest add ajesskit/kyos
+  ```
+  2. Run `/kyos-setup` skill that will help you define meaningful defaults for your project.
+
+  Pull updates with `npx skills update` when you feel like it.
+</details>
 
 ## The workflow
 
@@ -51,6 +63,7 @@ Three commands sit outside the main chain. Reach for them when the repo needs a 
 
 ## Tips
 
+- **Tailor the skills to match your flow** — kyos skills come with built-in references to `./claude/skill-override/<skill>.md` that gives you the best of both 1) reliable way to sync the curated skill content and 2) tweak the skill content for your specific workflow.
 - **Compact after spec or tech** — if the context meter hits 50%+ after `/spec` or `/tech`, run `/compact` before continuing. Everything is saved to disk, so nothing is lost and the next command starts with a clean budget.
 - **Clear before implement** — run `/clear` just before `/implement` to give the implementation run the full context window. Then reference the saved tasks file directly: `/implement @docs/execution/your-feature/tasks.md`.
 - **Pick up where you left off** — if `spec.md`, `tech.md`, or `tasks.md` already exist when you open a new session, pass them in directly: `/tech @docs/execution/your-feature/spec.md`. Claude will read the file and continue from there.
@@ -85,13 +98,6 @@ kyos-cli --add hook repo-sandbox     # Blocks Claude's attempts to access paths 
 ```
 
 MCP entries are wired up automatically.
-
-`/spec`, `/tech`, `/tasks`, `/implement`, `/verify`, `/prevalidate`, `/architecture`, and `/hire`
-ship as explicit-only skills (not a separate commands catalog), so the whole set is also published
-via `.claude-plugin/marketplace.json` and installable in any other agent harness with
-[`npx skills add`](https://github.com/vercel-labs/skills) — pass `--copy` so the install lands as a
-real file, not a symlink. Run the `kyos-setup` skill afterwards to configure per-repo overrides
-(e.g. where execution artifacts get saved) without hand-editing the installed skills.
 
 ## Multi-repo rollout
 
