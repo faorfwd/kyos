@@ -9,10 +9,6 @@ disable-model-invocation: true
 Pin down the technical shape of the repo so later planning is built on decisions instead of
 vibes.
 
-Before proceeding, check for `.claude/skill-overrides/_shared.md` and
-`.claude/skill-overrides/architecture.md` in this repo. If either exists, read it and apply it —
-on conflict, the per-skill file wins.
-
 ## Core question
 
 What are we actually building on, and where are the boundaries?
@@ -100,4 +96,5 @@ Optional additions (if helpful):
 
 ## Local additions
 
-Add repo-specific architecture conventions here.
+- Generic extensions are located at `.claude/skill-overrides/_shared.md`. 
+- Skill specific extensions are located at `.claude/skill-overrides/architecture.md`. These have priority when competing with more generic instructions.
