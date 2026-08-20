@@ -35,7 +35,7 @@ Useful outcomes include:
 
 Work in this order:
 
-1. Read `CLAUDE.md` and `.claude/skill-overrides/_shared.md` (repo/project context — architecture,
+1. Read `CLAUDE.md` (repo/project context — architecture,
    main components, external dependencies — if present).
 2. Inspect current support surfaces: `.mcp.json`, `.claude/agents/`, `.claude/skills/`.
 3. Infer the actual stack from docs and repo signals.
