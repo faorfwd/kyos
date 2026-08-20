@@ -25,8 +25,6 @@ at once.
 - existing test setup (test runner, frameworks, and CI checks), if any
 - `docs/execution/<spec-slug>/spec.md` — read automatically if it exists
 - `docs/execution/<spec-slug>/tech.md` — read automatically if it exists
-- `.claude/skill-overrides/_shared.md` and `.claude/skill-overrides/tasks.md`, if either exists in
-  this repo — read and apply them; the per-skill file wins on conflict with the shared one
 
 Derive the slug from $ARGUMENTS if provided; otherwise glob `docs/execution/*/` and use the most
 recently modified folder.
@@ -64,7 +62,7 @@ After saving tasks.md:
 2. Open `spec.md` in the same execution folder and add or update a link to `tasks.md` in its **Related** section (create the section if absent).
 3. Open `tech.md` in the same execution folder and add or update a link to `tasks.md` in its **Related** section (create the section if absent).
 
-## What Claude should return
+## What Agent should return
 
 The result should read like an execution board:
 
@@ -101,4 +99,6 @@ Use the same `<spec-slug>` chosen by the `spec` skill (the folder created under 
 
 ## Local additions
 
-Add repo-specific task-slicing conventions here.
+- Generic extensions are located at `.claude/skill-overrides/_shared.md`. 
+- Skill specific extensions are located at `.claude/skill-overrides/implement.md`. These have priority when competing with more generic instructions.
+
