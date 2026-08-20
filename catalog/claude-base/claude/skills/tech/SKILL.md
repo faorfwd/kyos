@@ -69,5 +69,5 @@ Write into `docs/execution/<spec-slug>/tech.md`, using the same slug chosen by t
 ## Local additions
 
 - Generic extensions are located at `.claude/skill-overrides/_shared.md`. 
-- Skill specific extensions are located at `.claude/skill-overrides/implement.md`. These have priority when competing with more generic instructions.
+- Skill specific extensions are located at `.claude/skill-overrides/tech.md`. These have priority when competing with more generic instructions.
 
