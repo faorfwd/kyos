@@ -25,8 +25,6 @@ deliberate pass over correctness, behavior, and risk.
 - `docs/execution/<spec-slug>/spec.md` — read automatically if it exists
 - `docs/execution/<spec-slug>/tech.md` — read automatically if it exists
 - `docs/execution/<spec-slug>/tasks.md` — read automatically if it exists
-- `.claude/skill-overrides/_shared.md` and `.claude/skill-overrides/verify.md`, if either exists in
-  this repo — read and apply them; the per-skill file wins on conflict with the shared one
 
 Derive the slug from $ARGUMENTS if provided; otherwise glob `docs/execution/*/` and use the most
 recently modified folder.
@@ -48,7 +46,7 @@ $ARGUMENTS
 - ignoring behavior drift just because the code looks reasonable
 - hiding gaps behind polite language
 
-## What Claude should return
+## What Agent should return
 
 The result should make it easy to decide what happens next:
 
@@ -70,4 +68,5 @@ If verification passes:
 
 ## Local additions
 
-Add repo-specific verification conventions here.
+- Generic extensions are located at `.claude/skill-overrides/_shared.md`. 
+- Skill specific extensions are located at `.claude/skill-overrides/implement.md`. These have priority when competing with more generic instructions.
