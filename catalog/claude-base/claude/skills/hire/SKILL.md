@@ -9,10 +9,6 @@ disable-model-invocation: true
 Stock the repo with the support it is missing before the next feature run trips over the same
 obvious gaps.
 
-Before proceeding, check for `.claude/skill-overrides/_shared.md` and
-`.claude/skill-overrides/hire.md` in this repo. If either exists, read it and apply it — on
-conflict, the per-skill file wins.
-
 ## Trigger
 
 Run this when the codebase has grown into a stack that the surrounding guidance has not caught up with.
@@ -98,4 +94,7 @@ Once the repo support layer is in better shape, continue with the `spec`, `tech`
 
 ## Local additions
 
-Add repo-specific hire conventions here.
+## Local additions
+
+- Generic extensions are located at `.claude/skill-overrides/_shared.md`. 
+- Skill specific extensions are located at `.claude/skill-overrides/hire.md`. These have priority when competing with more generic instructions.
