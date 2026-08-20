@@ -3,6 +3,7 @@
 [![Socket Badge](https://badge.socket.dev/npm/package/kyos-cli)](https://socket.dev/npm/package/kyos-cli)
 [![npm](https://img.shields.io/npm/v/kyos-cli)](https://www.npmjs.com/package/kyos-cli)
 [![npm downloads](https://img.shields.io/npm/dt/kyos-cli)](https://www.npmjs.com/package/kyos-cli)
+[![skills.sh](https://skills.sh/b/ajesskit/kyos)](https://skills.sh/ajesskit/kyos)
 [![License](https://img.shields.io/npm/l/kyos-cli)](https://www.npmjs.com/package/kyos-cli)
 [![Node version](https://img.shields.io/node/v/kyos-cli)](https://nodejs.org)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ajesskit-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/ajesskit)
